@@ -1,96 +1,65 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import StudentPage from "./studentprofile";   // Assuming the file name is StudentPage.jsx
+import FacultyPage from "./facultyprofile";
 function ProfilePage({ userId }) {
-    const [studentData, setStudentData] = useState(null);
+    const [role, setRole] = useState(null);
     const [error, setError] = useState(null);
     const navigate = useNavigate();
 
+    // Fetch user role based on the provided userId
     useEffect(() => {
-        const fetchStudentData = async () => {
+        const fetchUserRole = async () => {
             try {
-                const response = await fetch(`/students/${userId}`);
+                const response = await fetch("/users");
                 if (response.ok) {
-                    const data = await response.json();
-                    setStudentData(data);
+                    const users = await response.json();
+                    const currentUser = users.find(user => user.user_id === userId);
+                    if (currentUser) {
+                        setRole(currentUser.role);
+                    } else {
+                        setError('User not found');
+                    }
                 } else {
-                    const errorData = await response.json();
-                    setError(errorData.error);
+                    setError('Failed to fetch user roles');
                 }
             } catch (err) {
-                setError("Failed to fetch student data. Please try again later.");
+                setError("Failed to fetch user role. Please try again later.");
             }
         };
 
-        if (userId) fetchStudentData();
+        if (userId) fetchUserRole();
     }, [userId]);
 
+    // Handle error
     if (error) {
         return (
-            <div className="text-center text-red-500">
-                <p>{error}</p>
-                <button
-                    className="bg-blue-500 text-white py-2 px-4 rounded mt-4 hover:bg-blue-600"
-                    onClick={() => navigate("/home")}
-                >
-                    Go Back
-                </button>
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+                <div className="bg-white shadow-xl rounded-lg p-8 text-center max-w-md w-full">
+                    <p className="text-red-500 mb-4 text-lg">{error}</p>
+                    <button
+                        className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105"
+                        onClick={() => setError(null)}
+                    >
+                        Go Back
+                    </button>
+                </div>
             </div>
         );
     }
 
-    if (!studentData) {
-        return <div className="text-center">Loading...</div>;
+    // Render the StudentPage directly if the role is "Student"
+    if (role === "Student") {
+        return <StudentPage userId={userId} />;
     }
 
+    if (role === 'Faculty') {
+        return <FacultyPage userId={userId} />;
+    }
+    // You can handle other roles here like "Faculty", or display default message
     return (
-        <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
-            <h1 className="text-2xl font-bold mb-4">Profile</h1>
-            <div className="mb-4">
-                <img
-                    src={`data:image/jpeg;base64,${studentData.image}`}
-                    alt="Profile"
-                    className="rounded-full w-32 h-32 mx-auto mb-4"
-                />
-                <p className="text-lg font-semibold text-center">{studentData.name}</p>
-                <p className="text-sm text-gray-500 text-center">
-                    USN: {studentData.usn}
-                </p>
-            </div>
-            <div className="text-left">
-                <p>
-                    <strong>Department:</strong> {studentData.department_id}
-                </p>
-                <p>
-                    <strong>CGPA:</strong> {studentData.cgpa}
-                </p>
-                <p>
-                    <strong>Email:</strong> {studentData.personal_email}
-                </p>
-                <p>
-                    <strong>Phone:</strong> {studentData.phone_no}
-                </p>
-                <p>
-                    <strong>LinkedIn:</strong>{" "}
-                    <a
-                        href={studentData.linkedin_profile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        {studentData.linkedin_profile}
-                    </a>
-                </p>
-                <p>
-                    <strong>GitHub:</strong>{" "}
-                    <a
-                        href={studentData.github_profile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        {studentData.github_profile}
-                    </a>
-                </p>
-            </div>
+        <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+            <p className="text-lg text-gray-700">Role-based profile page for other roles goes here.</p>
         </div>
     );
 }

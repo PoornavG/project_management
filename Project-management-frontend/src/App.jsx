@@ -3,7 +3,8 @@ import { BrowserRouter as Router, Routes, Route, useParams } from "react-router-
 import LoginSignUp from "./Login";
 import HomePage from "./HomePage";
 import ProfilePage from "./profile"; // Renamed to match the import
-
+import StudentDetails from "./StudentDetails";
+import FacultyDetails from "./FacultyDetails";
 function App() {
   const [userId, setUserId] = useState(null); // Tracks the logged-in user's ID
 
@@ -19,6 +20,7 @@ function App() {
             }
           />
           {/* Home Route */}
+
           <Route
             path="/home"
             element={
@@ -29,6 +31,16 @@ function App() {
               )
             }
           />
+          {/* stuentdetails */}
+          <Route
+            path="/studentdetails"
+            element={<StudentDetails userId={userId} />}
+          />
+          {/*facultydetaiils*/}
+          <Route path="/facultydetails"
+            element={<FacultyDetails userId={userId} />}
+          />
+
           {/* Profile Route */}
           <Route
             path="/profile/:userId"

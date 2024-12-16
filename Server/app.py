@@ -230,6 +230,64 @@ def add_student():
     db.session.commit()
     return jsonify({'message': 'Student added successfully!'})
 
+@app.route('/students/<int:user_id>', methods=['PUT'])
+def update_student(user_id):
+    # Find the student by user_id
+    student = Student.query.filter_by(user_id=user_id).first()
+    
+    # Check if student exists
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
+    
+    # Get the data from the request
+    data = request.json
+    
+    # Update allowed fields
+    try:
+        # List of fields that can be updated
+        updatable_fields = [
+            'name', 
+            'personal_email', 
+            'phone_no', 
+            'linkedin_profile', 
+            'github_profile',
+            'cgpa'
+        ]
+        
+        # Validate CGPA if present
+        if 'cgpa' in data:
+            try:
+                cgpa = float(data['cgpa'])
+                if cgpa < 0 or cgpa > 10:
+                    return jsonify({'error': 'CGPA must be between 0 and 10'}), 400
+            except (TypeError, ValueError):
+                return jsonify({'error': 'CGPA must be a valid number'}), 400
+        
+        # Update only the allowed fields
+        for field in updatable_fields:
+            if field in data:
+                setattr(student, field, data[field])
+        
+        # Commit changes to the database
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Student profile updated successfully',
+            'student': {
+                'name': student.name,
+                'personal_email': student.personal_email,
+                'phone_no': student.phone_no,
+                'linkedin_profile': student.linkedin_profile,
+                'github_profile': student.github_profile,
+                'cgpa': student.cgpa
+            }
+        }), 200
+    
+    except Exception as e:
+        # Rollback in case of any error
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
 @app.route('/students/<int:user_id>', methods=['GET'])
 def get_student_by_user_id(user_id):
     student = Student.query.filter_by(user_id=user_id).first()
