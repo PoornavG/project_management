@@ -26,10 +26,12 @@ function LoginSignUp({ onLoginSuccess }) {
                 const userId = response.data.user_id;
 
                 if (!isLogin) {
-                    // Navigate to StudentDetails after signup
-                    navigate("/studentdetails", { state: { userId } });
+                    if (role === "Student") {
+                        navigate("/studentdetails", { state: { userId } });
+                    } else if (role === "Faculty") {
+                        navigate("/facultydetails", { state: { userId } });
+                    }
                 } else {
-                    // Navigate to HomePage after login
                     navigate("/home", { state: { userId } });
                     onLoginSuccess(userId);
                 }
