@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from flask_cors import CORS
-from models import db, User, Project, Department,Technologies,themes,Faculty,Student
+from models import db, User, Project, Department,Technologies,themes,Faculty,Student,StudentTechnology,FacultyTechnology
 import pymysql
 from flask_bcrypt import Bcrypt
 
@@ -179,6 +179,87 @@ def get_faculty():
         'github_profile': faculty.github_profile
     } for faculty in faculty_members])
 
+@app.route('/faculty/<int:user_id>', methods=['GET'])
+def get_faculty_by_id(user_id):
+    try:
+        # Query the faculty member by user_id
+        faculty = Faculty.query.filter_by(user_id=user_id).first()
+
+        # If the faculty member is not found, return a 404 error
+        if not faculty:
+            return jsonify({"error": "Faculty member not found"}), 404
+
+        # Prepare the faculty data for response
+        faculty_data = {
+            'faculty_id': faculty.faculty_id,
+            'name': faculty.name,
+            'department_id': faculty.department_id,
+            'designation': faculty.designation,
+            'role': faculty.role,
+            'personal_email': faculty.personal_email,
+            'phone_no': faculty.phone_no,
+            'linkedin_profile': faculty.linkedin_profile,
+            'github_profile': faculty.github_profile
+        }
+
+        return jsonify(faculty_data), 200
+
+    except Exception as e:
+        # Handle unexpected errors
+        return jsonify({"error": "An error occurred while fetching the faculty member", "details": str(e)}), 500
+@app.route('/faculty/<int:user_id>', methods=['PUT'])
+def update_faculty_by_id(user_id):
+    try:
+        # Query the faculty member by user_id
+        faculty = Faculty.query.filter_by(user_id=user_id).first()
+
+        # If the faculty member is not found, return a 404 error
+        if not faculty:
+            return jsonify({"error": "Faculty member not found"}), 404
+
+        # Get the updated data from the request body
+        data = request.get_json()
+
+        # Update faculty member fields, ensure they are provided in the request
+        if 'name' in data:
+            faculty.name = data['name']
+        if 'department_id' in data:
+            faculty.department_id = data['department_id']
+        if 'designation' in data:
+            faculty.designation = data['designation']
+        if 'role' in data:
+            faculty.role = data['role']
+        if 'personal_email' in data:
+            faculty.personal_email = data['personal_email']
+        if 'phone_no' in data:
+            faculty.phone_no = data['phone_no']
+        if 'linkedin_profile' in data:
+            faculty.linkedin_profile = data['linkedin_profile']
+        if 'github_profile' in data:
+            faculty.github_profile = data['github_profile']
+
+        # Commit the changes to the database
+        db.session.commit()
+
+        # Prepare the updated faculty data for response
+        updated_faculty_data = {
+            'faculty_id': faculty.faculty_id,
+            'name': faculty.name,
+            'department_id': faculty.department_id,
+            'designation': faculty.designation,
+            'role': faculty.role,
+            'personal_email': faculty.personal_email,
+            'phone_no': faculty.phone_no,
+            'linkedin_profile': faculty.linkedin_profile,
+            'github_profile': faculty.github_profile
+        }
+
+        return jsonify(updated_faculty_data), 200
+
+    except Exception as e:
+        # Handle unexpected errors
+        return jsonify({"error": "An error occurred while updating the faculty member", "details": str(e)}), 500
+
 @app.route('/faculty', methods=['POST'])
 def add_faculty():
     data = request.json
@@ -307,6 +388,101 @@ def get_student_by_user_id(user_id):
     else:
         return jsonify({'error': 'Student not found'}), 404
 
+@app.route('/student_technologies', methods=['POST'])
+def add_student_technology():
+    data = request.get_json()
+    student_id = data.get('student_id')
+    technology_id = data.get('technology_id')
+
+    if not student_id or not technology_id:
+        return jsonify({"error": "student_id and technology_id are required"}), 400
+
+    new_entry = StudentTechnology(student_id=student_id, technology_id=technology_id)
+    db.session.add(new_entry)
+    db.session.commit()
+    return jsonify({"message": "Student technology added successfully"}), 201
+
+# GET: Retrieve all technologies for a student
+@app.route('/student_technologies/<int:student_id>', methods=['GET'])
+def get_student_technologies(student_id):
+    technologies = StudentTechnology.query.filter_by(student_id=student_id).all()
+    return jsonify([{"student_id": tech.student_id, "technology_id": tech.technology_id} for tech in technologies]), 200
+
+# PUT: Update a student's technology
+@app.route('/student_technologies', methods=['PUT'])
+def update_student_technology():
+    data = request.get_json()
+    student_id = data.get('student_id')
+    old_technology_id = data.get('old_technology_id')
+    new_technology_id = data.get('new_technology_id')
+
+    if not student_id or not old_technology_id or not new_technology_id:
+        return jsonify({"error": "student_id, old_technology_id, and new_technology_id are required"}), 400
+
+    tech_entry = StudentTechnology.query.filter_by(student_id=student_id, technology_id=old_technology_id).first()
+
+    if not tech_entry:
+        return jsonify({"error": "Technology entry not found"}), 404
+
+    tech_entry.technology_id = new_technology_id
+    db.session.commit()
+    return jsonify({"message": "Student technology updated successfully"}), 200
+
+# POST: Add a new technology for a faculty
+@app.route('/faculty_technologies', methods=['POST'])
+def add_faculty_technology():
+    try:
+        data = request.get_json()
+        faculty_id = data.get('faculty_id')
+        technology_ids = data.get('technology_ids')  # Accept an array of technology IDs
+
+        if not faculty_id or not technology_ids:
+            return jsonify({"error": "faculty_id and technology_ids are required"}), 400
+
+        if not isinstance(technology_ids, list) or not all(isinstance(t_id, int) for t_id in technology_ids):
+            return jsonify({"error": "technology_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        faculty = Faculty.query.get(faculty_id)
+        if not faculty:
+            return jsonify({"error": "Faculty not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_technologies = Technologies.query.filter(Technologies.technology_id.in_(technology_ids)).all()
+        if len(valid_technologies) != len(technology_ids):
+            return jsonify({"error": "Some technology IDs are invalid"}), 400
+
+        # Add new faculty-technology entries
+        new_entries = [
+            FacultyTechnology(faculty_id=faculty_id, technology_id=technology_id)
+            for technology_id in technology_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        return jsonify({"message": "Faculty technologies added successfully"}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
+
+# GET: Retrieve all technologies for a faculty
+@app.route('/faculty_technologies/<int:faculty_id>', methods=['GET'])
+def get_faculty_technologies(faculty_id):
+    technologies = FacultyTechnology.query.filter_by(faculty_id=faculty_id).all()
+    return jsonify([{"faculty_id": tech.faculty_id, "technology_id": tech.technology_id} for tech in technologies]), 200
+
+# PUT: Update a faculty's technology
+
+
+    # Relationships
+   
+
+@app.cli.command('initdb')
+def init_db():
+    with app.app_context():
+        db.create_all()
+        print("Database initialized.")
 
 if __name__ == '__main__':
     with app.app_context():

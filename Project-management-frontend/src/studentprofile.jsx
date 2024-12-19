@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import axios from "axios";
 function StudentPage({ userId }) {
     const [studentData, setStudentData] = useState(null);
+    const [departments, setDepartments] = useState([]);
     const [error, setError] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState(null);
@@ -27,6 +28,22 @@ function StudentPage({ userId }) {
 
         if (userId) fetchStudentData();
     }, [userId]);
+
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const response = await axios.get("http://localhost:8080/departments");
+                setDepartments(response.data);
+                setLoading(false);
+            } catch (error) {
+                console.error("Error fetching departments:", error);
+                setLoading(false);
+            }
+        };
+
+        fetchDepartments();
+    }, []);
+    const departmentName = departments.find(dept => String(dept.department_id) === String(studentData.department_id))?.name || "N/A";
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -219,7 +236,7 @@ function StudentPage({ userId }) {
                                 <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
                                     <h3 className="text-lg font-semibold text-gray-700 mb-2">Academic Details</h3>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <p><strong className="text-gray-600">Department:</strong> {studentData.department_id}</p>
+                                        <p><strong className="text-gray-600">Department:</strong> {departmentName}</p>
                                         <p><strong className="text-gray-600">CGPA:</strong> {studentData.cgpa}</p>
                                     </div>
                                 </div>

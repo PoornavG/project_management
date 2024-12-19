@@ -1,47 +1,101 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 function FacultyPage({ userId }) {
     const [facultyData, setFacultyData] = useState(null);
+    const [departments, setDepartments] = useState([]);
+    const [facultyTechnologies, setFacultyTechnologies] = useState([]);
+    const [allTechnologies, setAllTechnologies] = useState([]);
     const [error, setError] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState(null);
+    const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
+    // Fetch faculty data and related technologies
     useEffect(() => {
-        const fetchFacultyData = async () => {
+        const fetchData = async () => {
             if (!userId) {
-                console.error("No user ID provided.");
                 setError("No user ID provided.");
                 return;
             }
 
-            console.log(`Fetching data for userId: ${userId}`); // Log userId to verify
             try {
-                const response = await fetch(`/faculty/${userId}`);
-                console.log("Response Status: ", response.status); // Log status of response
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log("Fetched Faculty Data: ", data); // Log fetched data
-                    setFacultyData(data);
-                    setEditedData(data);
-                } else {
-                    const errorData = await response.json();
-                    console.log("Error fetching data: ", errorData); // Log error response
-                    setError(errorData.error);
+                // Fetch faculty data
+                const facultyResponse = await fetch(`/faculty/${userId}`);
+                if (!facultyResponse.ok) {
+                    throw new Error("Failed to fetch faculty data");
+                }
+                const data = await facultyResponse.json();
+                setFacultyData(data);
+                setEditedData(data);
+
+                // Fetch faculty technologies using faculty_id
+                if (data.faculty_id) {
+                    try {
+                        const techResponse = await fetch(`/faculty_technologies/${data.faculty_id}`);
+                        const techData = await techResponse.json();
+
+                        // Map the technology IDs to a consistent structure
+                        const mappedTechData = techData.map(tech => ({
+                            id: tech.id || tech.technology_id || tech.Technology_id,
+                            name: tech.name || tech.technology_name || tech.Technology_Name
+                        }));
+
+                        setFacultyTechnologies(mappedTechData);
+                    } catch (error) {
+                        console.error('Error fetching faculty technologies:', error);
+                    }
                 }
             } catch (err) {
-                console.error("Failed to fetch faculty data: ", err); // Log fetch error
-                setError("Failed to fetch faculty data. Please try again later.");
+                console.error("Error fetching data:", err);
+                setError("Failed to fetch data. Please try again later.");
+            } finally {
+                setLoading(false);
             }
         };
 
-        fetchFacultyData();
+        fetchData();
     }, [userId]);
+
+    // Fetch departments
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const response = await axios.get("http://localhost:8080/departments");
+                setDepartments(response.data);
+            } catch (error) {
+                console.error("Error fetching departments:", error);
+            }
+        };
+
+        fetchDepartments();
+    }, []);
+
+    // Fetch all available technologies
+    useEffect(() => {
+        const fetchTechnologies = async () => {
+            try {
+                const response = await axios.get("/technologies");
+                const mappedTechnologies = response.data.map(tech => ({
+                    id: tech.id || tech.technology_id || tech.Technology_id,
+                    name: tech.name || tech.technology_name || tech.Technology_Name
+                }));
+                setAllTechnologies(mappedTechnologies);
+            } catch (error) {
+                console.error("Error fetching technologies:", error);
+            }
+        };
+
+        fetchTechnologies();
+    }, []);
+    const getTechnologyInfo = (techId) => {
+        return allTechnologies.find(tech => tech.id === techId) || null;
+    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        console.log(`Field changed: ${name}, New value: ${value}`); // Log field change
         setEditedData(prevData => ({
             ...prevData,
             [name]: value
@@ -50,8 +104,6 @@ function FacultyPage({ userId }) {
 
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
-        console.log("Updated Data to Submit: ", editedData); // Log the data being submitted
-
         try {
             const response = await fetch(`/faculty/${userId}`, {
                 method: 'PUT',
@@ -62,18 +114,15 @@ function FacultyPage({ userId }) {
             });
 
             if (response.ok) {
-                console.log("Profile updated successfully"); // Log success
                 setFacultyData(editedData);
                 setIsEditing(false);
                 setError(null);
                 alert('Profile updated successfully!');
             } else {
                 const errorData = await response.json();
-                console.log("Error updating profile: ", errorData); // Log error response
                 setError(errorData.error || 'Failed to update profile');
             }
         } catch (err) {
-            console.error("Failed to update faculty data: ", err); // Log update error
             setError("Failed to update faculty data. Please try again later.");
         }
     };
@@ -97,7 +146,7 @@ function FacultyPage({ userId }) {
         );
     }
 
-    if (!facultyData) {
+    if (loading || !facultyData) {
         return (
             <div className="min-h-screen bg-amber-50 flex items-center justify-center">
                 <div className="text-center">
@@ -107,6 +156,10 @@ function FacultyPage({ userId }) {
             </div>
         );
     }
+
+    const departmentName = departments.find(dept =>
+        String(dept.department_id) === String(facultyData.department_id)
+    )?.name || "N/A";
 
     return (
         <div className="min-h-screen bg-amber-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -128,6 +181,7 @@ function FacultyPage({ userId }) {
                 <div className="p-8">
                     {isEditing ? (
                         <form onSubmit={handleUpdateProfile} className="space-y-6">
+                            {/* ... existing form fields ... */}
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-gray-700 font-semibold mb-2">Name</label>
@@ -226,8 +280,29 @@ function FacultyPage({ userId }) {
                                 <div className="bg-amber-50 p-4 rounded-lg shadow-sm">
                                     <h3 className="text-lg font-semibold text-gray-700 mb-2">Professional Details</h3>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <p><strong className="text-gray-600">Department:</strong> {facultyData.department_id}</p>
+                                        <p><strong className="text-gray-600">Department:</strong> {departmentName}</p>
                                         <p><strong className="text-gray-600">Role:</strong> {facultyData.role}</p>
+                                    </div>
+                                </div>
+
+                                <div className="bg-amber-50 p-4 rounded-lg shadow-sm">
+                                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Technologies</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        {facultyTechnologies && facultyTechnologies.length > 0 ? (
+                                            facultyTechnologies.map((tech, index) => {
+                                                const fullTechInfo = getTechnologyInfo(tech.id);
+                                                return (
+                                                    <span
+                                                        key={index}
+                                                        className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                                                    >
+                                                        {fullTechInfo ? fullTechInfo.name : tech.name || 'Unknown'}
+                                                    </span>
+                                                );
+                                            })
+                                        ) : (
+                                            <p className="text-gray-500">No technologies specified</p>
+                                        )}
                                     </div>
                                 </div>
 

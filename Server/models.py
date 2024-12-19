@@ -33,6 +33,8 @@ class Technologies(db.Model):
     __tablename__='technologies'
     technology_id= db.Column(db.Integer,primary_key=True)
     name=db.Column(db.String(255),unique=True,nullable=False)
+    faculty_technologies = db.relationship('FacultyTechnology', back_populates='technology')
+
 
 class themes(db.Model):
     __tablename__='themes'
@@ -48,7 +50,7 @@ class ProjectDepartment(db.Model):
 
 # Faculty Table
 class Faculty(db.Model):
-    __tablename__ = 'Faculty'
+    __tablename__ = 'faculty'
     faculty_id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('Users.user_id'), nullable=False)
     name = db.Column(db.String(255), nullable=False)
@@ -60,6 +62,10 @@ class Faculty(db.Model):
     linkedin_profile = db.Column(db.String(255))
     github_profile = db.Column(db.String(255))
     image = db.Column(db.LargeBinary)
+    faculty_technologies = db.relationship('FacultyTechnology', back_populates='faculty')
+
+
+
 
 # Students Table
 class Student(db.Model):
@@ -88,10 +94,23 @@ class ProjectFaculty(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('Projects.project_id'), primary_key=True)
     faculty_id = db.Column(db.Integer, db.ForeignKey('Faculty.faculty_id'), primary_key=True)    
 
+class StudentTechnology(db.Model):
+    __tablename__ = 'student_technologies'
+    student_id = db.Column(db.Integer, db.ForeignKey('Students.student_id'), primary_key=True)
+    technology_id = db.Column(db.Integer, db.ForeignKey('Technologies.technology_id'), primary_key=True)
+
 class FacultyTechnology(db.Model):
     __tablename__ = 'faculty_technologies'
-    faculty_id = db.Column(db.Integer, db.ForeignKey('Faculty.faculty_id'), primary_key=True)
-    technology_id = db.Column(db.Integer, db.ForeignKey('Technologies.technology_id'), primary_key=True)
+    
+    faculty_id = db.Column(db.Integer, db.ForeignKey('faculty.faculty_id'), primary_key=True, nullable=False)
+    technology_id = db.Column(db.Integer, db.ForeignKey('technologies.technology_id'), primary_key=True, nullable=False)
+
+    # Relationships
+    faculty = db.relationship('Faculty', back_populates='faculty_technologies')
+    technology = db.relationship('Technologies', back_populates='faculty_technologies')
+
+
+
 
 class ProjectTheme(db.Model):
     __tablename__ = 'project_themes'
@@ -103,10 +122,7 @@ class ProjectTechnology(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('Projects.project_id'), primary_key=True)
     technology_id = db.Column(db.Integer, db.ForeignKey('Technologies.technology_id'), primary_key=True)
 
-class StudentTechnology(db.Model):
-    __tablename__ = 'student_technologies'
-    student_id = db.Column(db.Integer, db.ForeignKey('Students.student_id'), primary_key=True)
-    technology_id = db.Column(db.Integer, db.ForeignKey('Technologies.technology_id'), primary_key=True)
+
 
 
 

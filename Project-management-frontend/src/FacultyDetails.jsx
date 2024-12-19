@@ -18,8 +18,8 @@ function FacultyDetails({ userId: userIdProp, onComplete }) {
         github_profile: "",
     });
 
-    const [departments, setDepartments] = useState([]); // State to store the list of departments
-    const [loading, setLoading] = useState(true); // Loading state for departments
+    const [departments, setDepartments] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -47,6 +47,7 @@ function FacultyDetails({ userId: userIdProp, onComplete }) {
                 user_id: userId, // Include userId
                 ...formData,
             });
+
             alert("Faculty details added successfully!");
             navigate("/home", { state: { userId } });
         } catch (error) {
@@ -102,7 +103,7 @@ function FacultyDetails({ userId: userIdProp, onComplete }) {
                     })}
 
                     {loading ? (
-                        <div className="text-center text-gray-500">Loading departments...</div>
+                        <div className="text-center text-gray-500">Loading...</div>
                     ) : (
                         <button
                             type="submit"
