@@ -11,6 +11,7 @@ function FacultyPage({ userId }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState("");
     const navigate = useNavigate();
 
     // Fetch faculty data and related technologies
@@ -94,6 +95,7 @@ function FacultyPage({ userId }) {
         return allTechnologies.find(tech => tech.id === techId) || null;
     };
 
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setEditedData(prevData => ({
@@ -126,6 +128,25 @@ function FacultyPage({ userId }) {
             setError("Failed to update faculty data. Please try again later.");
         }
     };
+
+    const handleTechnologyChange = async (selectedTech) => {
+        const updatedTechnologies = facultyTechnologies.some(tech => tech.id === selectedTech.id)
+            ? facultyTechnologies.filter(tech => tech.id !== selectedTech.id)
+            : [...facultyTechnologies, selectedTech];
+
+        setFacultyTechnologies(updatedTechnologies);
+
+        try {
+            await axios.put(`/faculty_technologies/${facultyData.faculty_id}`, {
+                technology_ids: updatedTechnologies.map(tech => tech.id),
+            });
+        } catch (error) {
+            console.error("Error updating technologies:", error);
+        }
+    };
+
+    if (loading) return <div>Loading...</div>;
+    if (error) return <div>Error: {error}</div>;
 
     if (error) {
         return (
@@ -181,7 +202,7 @@ function FacultyPage({ userId }) {
                 <div className="p-8">
                     {isEditing ? (
                         <form onSubmit={handleUpdateProfile} className="space-y-6">
-                            {/* ... existing form fields ... */}
+                            {/* Existing Form Fields */}
                             <div className="grid md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-gray-700 font-semibold mb-2">Name</label>
@@ -254,6 +275,65 @@ function FacultyPage({ userId }) {
                                     />
                                 </div>
                             </div>
+                            {/* Technology Editor */}
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-2">Technologies</label>
+                                <div className="relative">
+                                    {/* Search Input */}
+                                    <input
+                                        type="text"
+                                        placeholder="Search technologies..."
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                    {/* Dropdown for Search Results */}
+                                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
+                                        {allTechnologies
+                                            .filter(
+                                                (tech) =>
+                                                    tech.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                                                    !facultyTechnologies.some((ft) => ft.id === tech.id)
+                                            )
+                                            .map((tech) => (
+                                                <div
+                                                    key={tech.id}
+                                                    className="px-4 py-2 hover:bg-amber-100 cursor-pointer"
+                                                    onClick={() =>
+                                                        setFacultyTechnologies((prev) => [...prev, {
+                                                            id: tech.id,
+                                                            name: tech.name || tech.technology_name || tech.Technology_Name
+                                                        }])
+                                                    }
+                                                >
+                                                    {tech.name || tech.technology_name || tech.Technology_Name}
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                                {/* Selected Technologies */}
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {facultyTechnologies.map((tech) => (
+                                        <span
+                                            key={tech.id}
+                                            className="bg-amber-600 text-white px-4 py-2 rounded-full flex items-center"
+                                        >
+                                            {tech.name || tech.technology_name || tech.Technology_Name}
+
+                                            <button
+                                                className="ml-2 text-white hover:text-red-500"
+                                                onClick={() =>
+                                                    setFacultyTechnologies((prev) =>
+                                                        prev.filter((t) => t.id !== tech.id)
+                                                    )
+                                                }
+                                            >
+                                                ✕
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
 
                             <button
                                 type="submit"
