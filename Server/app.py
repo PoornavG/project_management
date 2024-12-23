@@ -543,6 +543,48 @@ def update_faculty_technologies_put(faculty_id):
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
 
+@app.route('/student_technologies/<int:student_id>', methods=['PUT'])
+def update_student_technologies_put(student_id):
+    try:
+        data = request.get_json()
+        technology_ids = data.get('technology_ids')  # Accept an array of technology IDs
+
+        if not technology_ids:
+            return jsonify({"error": "technology_ids are required"}), 400
+
+        if not isinstance(technology_ids, list) or not all(isinstance(t_id, int) for t_id in technology_ids):
+            return jsonify({"error": "technology_ids must be a list of integers"}), 400
+
+        # Check if the student ID exists
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_technologies = Technologies.query.filter(Technologies.technology_id.in_(technology_ids)).all()
+        if len(valid_technologies) != len(technology_ids):
+            return jsonify({"error": "Some technology IDs are invalid"}), 400
+
+        # Clear existing technologies for the student
+        StudentTechnology.query.filter_by(student_id=student_id).delete()
+
+        # Add new student-technology entries
+        new_entries = [
+            StudentTechnology(student_id=student_id, technology_id=technology_id)
+            for technology_id in technology_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_technologies = StudentTechnology.query.filter_by(student_id=student_id).all()
+        return jsonify({
+            "message": "Student technologies updated successfully",
+            "technologies": [{"id": t.technology_id, "name": t.technology.name} for t in updated_technologies]
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
 
 # GET: Retrieve all technologies for a faculty
 @app.route('/faculty_technologies/<int:faculty_id>', methods=['GET'])

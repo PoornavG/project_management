@@ -57,7 +57,7 @@ function StudentPage({ userId }) {
 
         fetchData();
     }, [userId]);
-    console.log(studentTechnologies);
+
 
     useEffect(() => {
         const fetchDepartments = async () => {
@@ -91,7 +91,6 @@ function StudentPage({ userId }) {
     const getTechnologyInfo = (techId) => {
         return allTechnologies.find(tech => tech.id === techId) || null;
     };
-    console.log(allTechnologies);
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setEditedData(prevData => ({
@@ -100,50 +99,49 @@ function StudentPage({ userId }) {
         }));
     };
 
+    const [pendingTechnologies, setPendingTechnologies] = useState(studentTechnologies);
+
+    const handleTechnologyChange = (selectedTech) => {
+        // Update pending technologies
+        const updatedTechnologies = pendingTechnologies.some((tech) => tech.id === selectedTech.id)
+            ? pendingTechnologies.filter((tech) => tech.id !== selectedTech.id)
+            : [...pendingTechnologies, selectedTech];
+
+        setPendingTechnologies(updatedTechnologies);
+    };
+
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
+        setLoading(true);
         try {
-            // Validate CGPA before submission
-            const cgpa = parseFloat(editedData.cgpa);
-            if (isNaN(cgpa) || cgpa < 0 || cgpa > 10) {
-                setError('CGPA must be a number between 0 and 10');
-                return;
-            }
-
-            const response = await fetch(`/students/${userId}`, {
+            // Update profile data
+            const profileResponse = await fetch(`/students/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(editedData)
+                body: JSON.stringify(editedData),
             });
 
-            if (response.ok) {
-                setStudentData(editedData);
+            // Update technologies
+            const techResponse = await axios.put(`/student_technologies/${studentData.student_id}`, {
+                technology_ids: pendingTechnologies.map((tech) => tech.id),
+            });
+
+            if (profileResponse.ok && techResponse.status === 200) {
+                setStudentData(editedData); // Update profile state
+                setStudentTechnologies(pendingTechnologies); // Update technology state
                 setIsEditing(false);
                 setError(null);
-                alert('Profile updated successfully!');
+                alert('Changes saved successfully!');
             } else {
-                const errorData = await response.json();
-                setError(errorData.error || 'Failed to update profile');
+                const errorData = await profileResponse.json();
+                setError(errorData.error || 'Failed to update profile or technologies.');
             }
         } catch (err) {
-            setError("Failed to update student data. Please try again later.");
-        }
-    };
-    const handleTechnologyChange = async (selectedTech) => {
-        const updatedTechnologies = studentTechnologies.some(tech => tech.id === selectedTech.id)
-            ? studentTechnologies.filter(tech => tech.id !== selectedTech.id)
-            : [...studentTechnologies, selectedTech];
-
-        setStudentTechnologies(updatedTechnologies);
-
-        try {
-            await axios.put(`/student_technologies/${studentData.student_id}`, {
-                technology_ids: updatedTechnologies.map(tech => tech.id),
-            });
-        } catch (error) {
-            console.error("Error updating technologies:", error);
+            setError('Failed to save changes. Please try again later.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -292,17 +290,17 @@ function StudentPage({ userId }) {
                                             .filter(
                                                 (tech) =>
                                                     tech.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                                                    !studentTechnologies.some((ft) => ft.id === tech.id)
+                                                    !pendingTechnologies.some((pt) => pt.id === tech.id)
                                             )
                                             .map((tech) => (
                                                 <div
                                                     key={tech.id}
                                                     className="px-4 py-2 hover:bg-amber-100 cursor-pointer"
                                                     onClick={() =>
-                                                        setStudentTechnologies((prev) => [...prev, {
+                                                        handleTechnologyChange({
                                                             id: tech.id,
-                                                            name: tech.name || tech.technology_name || tech.Technology_Name
-                                                        }])
+                                                            name: tech.name || tech.technology_name || tech.Technology_Name,
+                                                        })
                                                     }
                                                 >
                                                     {tech.name || tech.technology_name || tech.Technology_Name}
@@ -312,20 +310,15 @@ function StudentPage({ userId }) {
                                 </div>
                                 {/* Selected Technologies */}
                                 <div className="mt-4 flex flex-wrap gap-2">
-                                    {studentTechnologies.map((tech) => (
+                                    {pendingTechnologies.map((tech) => (
                                         <span
                                             key={tech.id}
                                             className="bg-amber-600 text-white px-4 py-2 rounded-full flex items-center"
                                         >
                                             {tech.name || tech.technology_name || tech.Technology_Name}
-
                                             <button
                                                 className="ml-2 text-white hover:text-red-500"
-                                                onClick={() =>
-                                                    setStudentTechnologies((prev) =>
-                                                        prev.filter((t) => t.id !== tech.id)
-                                                    )
-                                                }
+                                                onClick={() => handleTechnologyChange(tech)}
                                             >
                                                 ✕
                                             </button>
@@ -333,7 +326,6 @@ function StudentPage({ userId }) {
                                     ))}
                                 </div>
                             </div>
-
                             <button
                                 type="submit"
                                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:opacity-90 transition duration-300 ease-in-out transform hover:scale-[1.01] shadow-lg"

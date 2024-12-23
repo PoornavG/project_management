@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import TechnologyEditor from "./tech_editor";
+
 function FacultyPage({ userId }) {
     const [facultyData, setFacultyData] = useState(null);
     const [departments, setDepartments] = useState([]);
@@ -12,35 +12,6 @@ function FacultyPage({ userId }) {
     const [editedData, setEditedData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-
-    const handleSaveChanges = async () => {
-        try {
-            // API call to update profile
-            const profileResponse = await fetch(`/faculty/${userId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editedData),
-            });
-
-            // API call to update technologies
-            const techResponse = await axios.put(`/faculty_technologies/${facultyData.faculty_id}`, {
-                technology_ids: pendingTechnologies.map((tech) => tech.id),
-            });
-
-            if (profileResponse.ok && techResponse.status === 200) {
-                setFacultyData(editedData); // Update profile data
-                setFacultyTechnologies(pendingTechnologies); // Update technologies
-                setIsEditing(false); // Exit editing mode
-                setError(null); // Clear errors
-                alert('Changes saved successfully!');
-            } else {
-                const errorData = await profileResponse.json();
-                setError(errorData.error || 'Failed to update profile or technologies.');
-            }
-        } catch (err) {
-            setError('Failed to save changes. Please try again later.');
-        }
-    };
     const navigate = useNavigate();
 
     // Fetch faculty data and related technologies
