@@ -1,33 +1,97 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import axios from "axios";
 function StudentPage({ userId }) {
     const [studentData, setStudentData] = useState(null);
+    const [departments, setDepartments] = useState([]);
+    const [studentTechnologies, setStudentTechnologies] = useState([]);
+    const [allTechnologies, setAllTechnologies] = useState([]);
     const [error, setError] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editedData, setEditedData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState("");
     const navigate = useNavigate();
 
     useEffect(() => {
-        const fetchStudentData = async () => {
+        const fetchData = async () => {
+            if (!userId) {
+                setError("No user ID provided.");
+                return;
+            }
+
             try {
-                const response = await fetch(`/students/${userId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    setStudentData(data);
-                    setEditedData(data);
-                } else {
-                    const errorData = await response.json();
-                    setError(errorData.error);
+                // Fetch student data
+                const studentResponse = await fetch(`/students/${userId}`);
+                if (!studentResponse.ok) {
+                    throw new Error("Failed to fetch student data");
+                }
+                const data = await studentResponse.json();
+                setStudentData(data);
+                setEditedData(data);
+
+                // Fetch student technologies using student_id
+                if (data.student_id) {
+                    try {
+                        const techResponse = await fetch(`/student_technologies/${data.student_id}`);
+                        const techData = await techResponse.json();
+
+                        // Map the technology IDs to a consistent structure
+                        const mappedTechData = techData.map(tech => ({
+                            id: tech.id || tech.technology_id || tech.Technology_id,
+                            name: tech.name || tech.technology_name || tech.Technology_Name
+                        }));
+
+                        setStudentTechnologies(mappedTechData);
+                    } catch (error) {
+                        console.error('Error fetching student technologies:', error);
+                    }
                 }
             } catch (err) {
-                setError("Failed to fetch student data. Please try again later.");
+                console.error("Error fetching data:", err);
+                setError("Failed to fetch data. Please try again later.");
+            } finally {
+                setLoading(false);
             }
         };
 
-        if (userId) fetchStudentData();
+        fetchData();
     }, [userId]);
+    console.log(studentTechnologies);
 
+    useEffect(() => {
+        const fetchDepartments = async () => {
+            try {
+                const response = await axios.get("http://localhost:8080/departments");
+                setDepartments(response.data);
+            } catch (error) {
+                console.error("Error fetching departments:", error);
+            }
+        };
+
+        fetchDepartments();
+    }, []);
+    const departmentName = departments.find(dept => String(dept.department_id) === String(studentData.department_id))?.name || "N/A";
+    useEffect(() => {
+        const fetchTechnologies = async () => {
+            try {
+                const response = await axios.get("/technologies");
+                const mappedTechnologies = response.data.map(tech => ({
+                    id: tech.id || tech.technology_id || tech.Technology_id,
+                    name: tech.name || tech.technology_name || tech.Technology_Name
+                }));
+                setAllTechnologies(mappedTechnologies);
+            } catch (error) {
+                console.error("Error fetching technologies:", error);
+            }
+        };
+
+        fetchTechnologies();
+    }, []);
+    const getTechnologyInfo = (techId) => {
+        return allTechnologies.find(tech => tech.id === techId) || null;
+    };
+    console.log(allTechnologies);
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setEditedData(prevData => ({
@@ -67,6 +131,24 @@ function StudentPage({ userId }) {
             setError("Failed to update student data. Please try again later.");
         }
     };
+    const handleTechnologyChange = async (selectedTech) => {
+        const updatedTechnologies = studentTechnologies.some(tech => tech.id === selectedTech.id)
+            ? studentTechnologies.filter(tech => tech.id !== selectedTech.id)
+            : [...studentTechnologies, selectedTech];
+
+        setStudentTechnologies(updatedTechnologies);
+
+        try {
+            await axios.put(`/student_technologies/${studentData.student_id}`, {
+                technology_ids: updatedTechnologies.map(tech => tech.id),
+            });
+        } catch (error) {
+            console.error("Error updating technologies:", error);
+        }
+    };
+
+    if (loading) return <div>Loading...</div>;
+    if (error) return <div>Error: {error}</div>;
 
     if (error) {
         return (
@@ -193,6 +275,64 @@ function StudentPage({ userId }) {
                                     />
                                 </div>
                             </div>
+                            {/* Technology Editor */}
+                            <div>
+                                <label className="block text-gray-700 font-semibold mb-2">Technologies</label>
+                                <div className="relative">
+                                    {/* Search Input */}
+                                    <input
+                                        type="text"
+                                        placeholder="Search technologies..."
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
+                                    {/* Dropdown for Search Results */}
+                                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
+                                        {allTechnologies
+                                            .filter(
+                                                (tech) =>
+                                                    tech.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                                                    !studentTechnologies.some((ft) => ft.id === tech.id)
+                                            )
+                                            .map((tech) => (
+                                                <div
+                                                    key={tech.id}
+                                                    className="px-4 py-2 hover:bg-amber-100 cursor-pointer"
+                                                    onClick={() =>
+                                                        setStudentTechnologies((prev) => [...prev, {
+                                                            id: tech.id,
+                                                            name: tech.name || tech.technology_name || tech.Technology_Name
+                                                        }])
+                                                    }
+                                                >
+                                                    {tech.name || tech.technology_name || tech.Technology_Name}
+                                                </div>
+                                            ))}
+                                    </div>
+                                </div>
+                                {/* Selected Technologies */}
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                    {studentTechnologies.map((tech) => (
+                                        <span
+                                            key={tech.id}
+                                            className="bg-amber-600 text-white px-4 py-2 rounded-full flex items-center"
+                                        >
+                                            {tech.name || tech.technology_name || tech.Technology_Name}
+
+                                            <button
+                                                className="ml-2 text-white hover:text-red-500"
+                                                onClick={() =>
+                                                    setStudentTechnologies((prev) =>
+                                                        prev.filter((t) => t.id !== tech.id)
+                                                    )
+                                                }
+                                            >
+                                                ✕
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
 
                             <button
                                 type="submit"
@@ -210,31 +350,80 @@ function StudentPage({ userId }) {
                                     alt="Profile"
                                     className="w-48 h-48 object-cover rounded-full mx-auto mb-4 shadow-lg border-4 border-white"
                                 />
-                                <h2 className="text-2xl font-bold text-gray-800">{studentData.name}</h2>
-                                <p className="text-gray-500 text-sm">USN: {studentData.usn}</p>
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    {studentData.name}
+                                </h2>
+                                <p className="text-gray-500 text-sm">
+                                    USN: {studentData.usn}
+                                </p>
+                            </div>
+
+                            {/* Technologies Section */}
+                            <div className="bg-gradient-to-r from-white to-white p-6 rounded-lg">
+                                <h3 className="text-lg font-semibold text-black mb-2">
+                                    Technologies
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {studentTechnologies && studentTechnologies.length > 0 ? (
+                                        studentTechnologies.map((tech, index) => {
+                                            const fullTechInfo = getTechnologyInfo(tech.id);
+                                            return (
+                                                <span
+                                                    key={index}
+                                                    className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                                                >
+                                                    {fullTechInfo ? fullTechInfo.name : tech.name || 'Unknown'}
+                                                </span>
+                                            );
+                                        })
+                                    ) : (
+                                        <p className="text-gray-200">No technologies specified</p>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Detailed Profile Information */}
-                            <div className="md:col-span-2 space-y-4">
-                                <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-                                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Academic Details</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <p><strong className="text-gray-600">Department:</strong> {studentData.department_id}</p>
-                                        <p><strong className="text-gray-600">CGPA:</strong> {studentData.cgpa}</p>
+                            <div className="md:col-span-2 space-y-6">
+                                {/* Academic Details */}
+                                <div className="bg-white p-6 rounded-lg shadow-sm">
+                                    <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                                        Academic Details
+                                    </h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <p>
+                                            <strong className="text-gray-600">Department:</strong>{" "}
+                                            {departmentName}
+                                        </p>
+                                        <p>
+                                            <strong className="text-gray-600">CGPA:</strong>{" "}
+                                            {studentData.cgpa}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-                                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Contact Information</h3>
-                                    <div className="space-y-2">
-                                        <p><strong className="text-gray-600">Email:</strong> {studentData.personal_email}</p>
-                                        <p><strong className="text-gray-600">Phone:</strong> {studentData.phone_no}</p>
+                                {/* Contact Information */}
+                                <div className="bg-white p-6 rounded-lg shadow-sm">
+                                    <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                                        Contact Information
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <p>
+                                            <strong className="text-gray-600">Email:</strong>{" "}
+                                            {studentData.personal_email}
+                                        </p>
+                                        <p>
+                                            <strong className="text-gray-600">Phone:</strong>{" "}
+                                            {studentData.phone_no}
+                                        </p>
                                     </div>
                                 </div>
 
-                                <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-                                    <h3 className="text-lg font-semibold text-gray-700 mb-2">Professional Profiles</h3>
-                                    <div className="space-y-2">
+                                {/* Professional Profiles */}
+                                <div className="bg-white p-6 rounded-lg shadow-sm">
+                                    <h3 className="text-lg font-semibold text-gray-700 mb-4">
+                                        Professional Profiles
+                                    </h3>
+                                    <div className="space-y-3">
                                         <p>
                                             <strong className="text-gray-600">LinkedIn:</strong>{" "}
                                             <a
