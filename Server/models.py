@@ -34,6 +34,7 @@ class Technologies(db.Model):
     technology_id= db.Column(db.Integer,primary_key=True)
     name=db.Column(db.String(255),unique=True,nullable=False)
     faculty_technologies = db.relationship('FacultyTechnology', back_populates='technology')
+    student_technologies = db.relationship('StudentTechnology', back_populates='technology')
 
 
 class themes(db.Model):
@@ -81,6 +82,7 @@ class Student(db.Model):
     linkedin_profile = db.Column(db.String(255))
     github_profile = db.Column(db.String(255))
     image = db.Column(db.LargeBinary)
+    student_technologies = db.relationship('StudentTechnology', back_populates='student')
 
 # Project-Students Table (Many-to-Many Relationship)
 class ProjectStudent(db.Model):
@@ -97,7 +99,11 @@ class ProjectFaculty(db.Model):
 class StudentTechnology(db.Model):
     __tablename__ = 'student_technologies'
     student_id = db.Column(db.Integer, db.ForeignKey('Students.student_id'), primary_key=True)
-    technology_id = db.Column(db.Integer, db.ForeignKey('Technologies.technology_id'), primary_key=True)
+    technology_id = db.Column(db.Integer, db.ForeignKey('technologies.technology_id'), primary_key=True)
+
+    student = db.relationship('Student', back_populates='student_technologies')
+    technology = db.relationship('Technologies', back_populates='student_technologies')
+
 
 class FacultyTechnology(db.Model):
     __tablename__ = 'faculty_technologies'

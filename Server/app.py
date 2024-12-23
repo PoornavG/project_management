@@ -389,24 +389,51 @@ def get_student_by_user_id(user_id):
         return jsonify({'error': 'Student not found'}), 404
 
 @app.route('/student_technologies', methods=['POST'])
-def add_student_technology():
-    data = request.get_json()
-    student_id = data.get('student_id')
-    technology_id = data.get('technology_id')
+def update_student_technologies():
+    try:
+        data = request.get_json()
+        student_id = data.get('student_id')
+        technology_ids = data.get('technology_ids')  # Accept an array of technology IDs
 
-    if not student_id or not technology_id:
-        return jsonify({"error": "student_id and technology_id are required"}), 400
+        if not student_id or not technology_ids:
+            return jsonify({"error": "student_id and technology_ids are required"}), 400
 
-    new_entry = StudentTechnology(student_id=student_id, technology_id=technology_id)
-    db.session.add(new_entry)
-    db.session.commit()
-    return jsonify({"message": "Student technology added successfully"}), 201
+        if not isinstance(technology_ids, list) or not all(isinstance(t_id, int) for t_id in technology_ids):
+            return jsonify({"error": "technology_ids must be a list of integers"}), 400
+
+        # Check if the student ID exists
+        student = Student.query.get(student_id)
+        if not student:
+            return jsonify({"error": "Student not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_technologies = Technologies.query.filter(Technologies.technology_id.in_(technology_ids)).all()
+        if len(valid_technologies) != len(technology_ids):
+            return jsonify({"error": "Some technology IDs are invalid"}), 400
+
+        # Clear existing technologies for the student
+        StudentTechnology.query.filter_by(student_id=student_id).delete()
+
+        # Add new student-technology entries
+        new_entries = [
+            StudentTechnology(student_id=student_id, technology_id=technology_id)
+            for technology_id in technology_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_technologies = StudentTechnology.query.filter_by(student_id=student_id).all()
+        return jsonify({
+            "message": "Student technologies updated successfully",
+            "technologies": [{"id": t.technology_id, "name": t.technology.name} for t in updated_technologies]
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
 
 # GET: Retrieve all technologies for a student
-@app.route('/student_technologies/<int:student_id>', methods=['GET'])
-def get_student_technologies(student_id):
-    technologies = StudentTechnology.query.filter_by(student_id=student_id).all()
-    return jsonify([{"student_id": tech.student_id, "technology_id": tech.technology_id} for tech in technologies]), 200
+
 
 # PUT: Update a student's technology
 @app.route('/student_technologies', methods=['PUT'])
@@ -430,7 +457,7 @@ def update_student_technology():
 
 # POST: Add a new technology for a faculty
 @app.route('/faculty_technologies', methods=['POST'])
-def add_faculty_technology():
+def update_faculty_technologies():
     try:
         data = request.get_json()
         faculty_id = data.get('faculty_id')
@@ -452,6 +479,9 @@ def add_faculty_technology():
         if len(valid_technologies) != len(technology_ids):
             return jsonify({"error": "Some technology IDs are invalid"}), 400
 
+        # Clear existing technologies for the faculty
+        FacultyTechnology.query.filter_by(faculty_id=faculty_id).delete()
+
         # Add new faculty-technology entries
         new_entries = [
             FacultyTechnology(faculty_id=faculty_id, technology_id=technology_id)
@@ -460,7 +490,55 @@ def add_faculty_technology():
         db.session.add_all(new_entries)
         db.session.commit()
 
-        return jsonify({"message": "Faculty technologies added successfully"}), 201
+        # Return updated list of technologies
+        updated_technologies = FacultyTechnology.query.filter_by(faculty_id=faculty_id).all()
+        return jsonify({
+            "message": "Faculty technologies updated successfully",
+            "technologies": [{"id": t.technology_id, "name": t.technology.name} for t in updated_technologies]
+        }), 200 if request.method == 'PUT' else 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
+@app.route('/faculty_technologies/<int:faculty_id>', methods=['PUT'])
+def update_faculty_technologies_put(faculty_id):
+    try:
+        data = request.get_json()
+        technology_ids = data.get('technology_ids')  # Accept an array of technology IDs
+
+        if not technology_ids:
+            return jsonify({"error": "technology_ids are required"}), 400
+
+        if not isinstance(technology_ids, list) or not all(isinstance(t_id, int) for t_id in technology_ids):
+            return jsonify({"error": "technology_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        faculty = Faculty.query.get(faculty_id)
+        if not faculty:
+            return jsonify({"error": "Faculty not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_technologies = Technologies.query.filter(Technologies.technology_id.in_(technology_ids)).all()
+        if len(valid_technologies) != len(technology_ids):
+            return jsonify({"error": "Some technology IDs are invalid"}), 400
+
+        # Clear existing technologies for the faculty
+        FacultyTechnology.query.filter_by(faculty_id=faculty_id).delete()
+
+        # Add new faculty-technology entries
+        new_entries = [
+            FacultyTechnology(faculty_id=faculty_id, technology_id=technology_id)
+            for technology_id in technology_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_technologies = FacultyTechnology.query.filter_by(faculty_id=faculty_id).all()
+        return jsonify({
+            "message": "Faculty technologies updated successfully",
+            "technologies": [{"id": t.technology_id, "name": t.technology.name} for t in updated_technologies]
+        }), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
@@ -472,10 +550,10 @@ def get_faculty_technologies(faculty_id):
     technologies = FacultyTechnology.query.filter_by(faculty_id=faculty_id).all()
     return jsonify([{"faculty_id": tech.faculty_id, "technology_id": tech.technology_id} for tech in technologies]), 200
 
-# PUT: Update a faculty's technology
-
-
-    # Relationships
+@app.route('/student_technologies/<int:student_id>', methods=['GET'])
+def get_student_technologies(student_id):
+    technologies = StudentTechnology.query.filter_by(student_id=student_id).all()
+    return jsonify([{"student_id": tech.student_id, "technology_id": tech.technology_id} for tech in technologies]), 200
    
 
 @app.cli.command('initdb')

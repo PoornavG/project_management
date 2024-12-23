@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-
+import TechnologyEditor from "./tech_editor";
 function FacultyPage({ userId }) {
     const [facultyData, setFacultyData] = useState(null);
     const [departments, setDepartments] = useState([]);
@@ -130,18 +130,22 @@ function FacultyPage({ userId }) {
     };
 
     const handleTechnologyChange = async (selectedTech) => {
-        const updatedTechnologies = facultyTechnologies.some(tech => tech.id === selectedTech.id)
-            ? facultyTechnologies.filter(tech => tech.id !== selectedTech.id)
-            : [...facultyTechnologies, selectedTech];
-
-        setFacultyTechnologies(updatedTechnologies);
-
         try {
+            // Create the updated list first
+            const updatedTechnologies = facultyTechnologies.some(tech => tech.id === selectedTech.id)
+                ? facultyTechnologies.filter(tech => tech.id !== selectedTech.id)
+                : [...facultyTechnologies, selectedTech];
+
+            // Make the API call first
             await axios.put(`/faculty_technologies/${facultyData.faculty_id}`, {
                 technology_ids: updatedTechnologies.map(tech => tech.id),
             });
+
+            // Only update the UI state after successful API call
+            setFacultyTechnologies(updatedTechnologies);
         } catch (error) {
             console.error("Error updating technologies:", error);
+            // You might want to show an error message to the user here
         }
     };
 
@@ -298,12 +302,10 @@ function FacultyPage({ userId }) {
                                                 <div
                                                     key={tech.id}
                                                     className="px-4 py-2 hover:bg-amber-100 cursor-pointer"
-                                                    onClick={() =>
-                                                        setFacultyTechnologies((prev) => [...prev, {
-                                                            id: tech.id,
-                                                            name: tech.name || tech.technology_name || tech.Technology_Name
-                                                        }])
-                                                    }
+                                                    onClick={() => handleTechnologyChange({
+                                                        id: tech.id,
+                                                        name: tech.name || tech.technology_name || tech.Technology_Name
+                                                    })}
                                                 >
                                                     {tech.name || tech.technology_name || tech.Technology_Name}
                                                 </div>
@@ -321,11 +323,7 @@ function FacultyPage({ userId }) {
 
                                             <button
                                                 className="ml-2 text-white hover:text-red-500"
-                                                onClick={() =>
-                                                    setFacultyTechnologies((prev) =>
-                                                        prev.filter((t) => t.id !== tech.id)
-                                                    )
-                                                }
+                                                onClick={() => handleTechnologyChange(tech)}
                                             >
                                                 ✕
                                             </button>
