@@ -5,6 +5,8 @@ import HomePage from "./HomePage";
 import ProfilePage from "./profile"; // Renamed to match the import
 import StudentDetails from "./StudentDetails";
 import FacultyDetails from "./FacultyDetails";
+import MyProjects from "./MyProjects";
+import AddProject from "./AddProject";
 function App() {
   const [userId, setUserId] = useState(null); // Tracks the logged-in user's ID
 
@@ -40,7 +42,12 @@ function App() {
           <Route path="/facultydetails"
             element={<FacultyDetails userId={userId} />}
           />
-
+          <Route path="/myprojects/:userId"
+            element={<ProjectWrapper />}
+          />
+          <Route path="/add-project/:userId"
+            element={<AddProjectWrapper />}
+          />
           {/* Profile Route */}
           <Route
             path="/profile/:userId"
@@ -57,5 +64,12 @@ function ProfileWrapper() {
   const { userId } = useParams();
   return <ProfilePage userId={parseInt(userId, 10)} />;
 }
-
+function ProjectWrapper() {
+  const { userId } = useParams();
+  return <MyProjects userId={parseInt(userId, 10)} />;
+}
+function AddProjectWrapper() {
+  const { userId } = useParams();
+  return <AddProject ownerId={parseInt(userId, 10)} />;
+}
 export default App;

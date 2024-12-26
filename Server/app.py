@@ -128,25 +128,64 @@ def get_projects():
         'students_involved_count': project.students_involved_count,
         'start_date': project.start_date,
         'end_date': project.end_date,
-        'github_link': project.github_link
+        'github_link': project.github_link,
+        'owner_id':project.owner_id
+    } for project in projects])
+
+@app.route('/projectsown/<int:owner_id>', methods=['GET'])
+def get_projects_by_owner(owner_id):
+    # Query all projects with the specified owner_id
+    projects = Project.query.filter_by(owner_id=owner_id).all()
+    
+    # If no projects are found, return an appropriate message
+    if not projects:
+        return jsonify({'message': f'No projects found for owner_id {owner_id}'}), 404
+    
+    # Return the projects in JSON format
+    return jsonify([{
+        'project_id': project.project_id,
+        'name': project.name,
+        'description': project.description,
+        'budget': str(project.budget),
+        'status': project.status,
+        'students_involved_count': project.students_involved_count,
+        'start_date': project.start_date,
+        'end_date': project.end_date,
+        'github_link': project.github_link,
+        'owner_id': project.owner_id
     } for project in projects])
 
 @app.route('/projects', methods=['POST'])
 def add_project():
-    data = request.json
-    new_project = Project(
-        name=data['name'],
-        description=data['description'],
-        budget=data['budget'],
-        status=data['status'],
-        students_involved_count=data['students_involved_count'],
-        start_date=data['start_date'],
-        end_date=data['end_date'],
-        github_link=data['github_link']
-    )
-    db.session.add(new_project)
-    db.session.commit()
-    return jsonify({'message': 'Project added successfully!'})
+    try:
+        data = request.json
+        
+        # Check if the owner exists
+        owner = User.query.get(data['owner_id'])
+        if not owner:
+            return jsonify({'error': 'Owner with the provided ID does not exist.'}), 400
+        
+        # Create a new project instance
+        new_project = Project(
+            name=data['name'],
+            description=data.get('description', ''),
+            budget=data.get('budget', 0.00),
+            status=data.get('status', 'Proposed'),
+            students_involved_count=data.get('students_involved_count', 0),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+            github_link=data.get('github_link', ''),
+            image=data.get('image', None),
+            owner_id=data['owner_id']
+        )
+        
+        # Add and commit the project
+        db.session.add(new_project)
+        db.session.commit()
+        
+        return jsonify({'message': 'Project added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'error': 'An unexpected error occurred.', 'details': str(e)}), 500
 
 @app.route('/departments', methods=['GET'])
 def get_departments():

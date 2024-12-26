@@ -40,6 +40,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/technologies/, '/technologies') // Optional rewrite
       },
+      '/projects': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/projects/, '/projects') // Optional rewrite
+      },
     }
   }
 });

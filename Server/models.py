@@ -10,6 +10,7 @@ class User(db.Model):
     hashed_password = db.Column(db.String(255), nullable=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     is_profile_complete = db.Column(db.Boolean, default=False) 
+    
 
 class Project(db.Model):
     __tablename__ = 'Projects'
@@ -23,7 +24,8 @@ class Project(db.Model):
     end_date = db.Column(db.Date)
     github_link = db.Column(db.String(255))
     image = db.Column(db.LargeBinary)
-
+    owner_id = db.Column(db.Integer, db.ForeignKey('Users.user_id'), nullable=False)
+    owner = db.relationship('User', backref='projects')
 class Department(db.Model):
     __tablename__ = 'Departments'
     department_id = db.Column(db.Integer, primary_key=True)
