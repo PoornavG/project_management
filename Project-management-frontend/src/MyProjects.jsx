@@ -10,13 +10,19 @@ function MyProjects({ userId }) {
     const [updatedFields, setUpdatedFields] = useState({});
     const [loading, setLoading] = useState(false);
     const [allTechnologies, setAllTechnologies] = useState([]);
+    const [projectTechnologies, setProjectTechnologies] = useState({});
+    const [pendingTechnologies, setPendingTechnologies] = useState({});
+    const [searchTerm, setSearchTerm] = useState("");
+
     useEffect(() => {
-        // Fetch projects created by the user
         const fetchProjects = async () => {
             try {
                 const response = await axios.get(`/projectsown/${userId}`);
                 if (Array.isArray(response.data)) {
                     setUserProjects(response.data);
+                    response.data.forEach(project => {
+                        fetchProjectTechnologies(project.project_id);
+                    });
                 } else {
                     throw new Error("Unexpected response format.");
                 }
@@ -45,13 +51,36 @@ function MyProjects({ userId }) {
 
         fetchTechnologies();
     }, []);
+
+    const fetchProjectTechnologies = async (projectId) => {
+        try {
+            const response = await axios.get(`/project_technologies/${projectId}`);
+            const mappedTechData = response.data.map(tech => ({
+                id: tech.id || tech.technology_id || tech.Technology_id,
+                name: tech.name || tech.technology_name || tech.Technology_Name || getTechnologyInfo(tech.id)?.name
+            }));
+            setProjectTechnologies(prev => ({
+                ...prev,
+                [projectId]: mappedTechData
+            }));
+        } catch (error) {
+            console.error(`Error fetching technologies for project ${projectId}:`, error);
+        }
+    };
+
+
+
     const getTechnologyInfo = (techId) => {
         return allTechnologies.find(tech => tech.id === techId) || null;
     };
-    
+
     const openModal = (project) => {
         setSelectedProject(project);
-        setUpdatedFields({ ...project }); // Populate fields with current project details
+        setUpdatedFields({ ...project });
+        setPendingTechnologies({
+            ...pendingTechnologies,
+            [project.project_id]: projectTechnologies[project.project_id] || []
+        });
         setIsModalOpen(true);
     };
 
@@ -59,27 +88,58 @@ function MyProjects({ userId }) {
         setIsModalOpen(false);
         setSelectedProject(null);
         setUpdatedFields({});
+        setSearchTerm("");
     };
 
     const handleFieldChange = (e) => {
         const { name, value } = e.target;
-        setUpdatedFields((prevFields) => ({ ...prevFields, [name]: value }));
+        setUpdatedFields(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleTechnologyChange = (selectedTech) => {
+        if (!selectedProject) return;
+
+        const projectId = selectedProject.project_id;
+        const currentTechnologies = pendingTechnologies[projectId] || [];
+
+        const updatedTechnologies = currentTechnologies.some(tech => tech.id === selectedTech.id)
+            ? currentTechnologies.filter(tech => tech.id !== selectedTech.id)
+            : [...currentTechnologies, selectedTech];
+
+        setPendingTechnologies(prev => ({
+            ...prev,
+            [projectId]: updatedTechnologies
+        }));
     };
 
     const saveChanges = async () => {
         setLoading(true);
         try {
             await axios.put(`/projects/${selectedProject.project_id}`, updatedFields);
-            setUserProjects((prevProjects) =>
-                prevProjects.map((project) =>
+
+            await axios.put(`/project_technologies/${selectedProject.project_id}`, {
+                technology_ids: pendingTechnologies[selectedProject.project_id].map(tech => tech.id)
+            });
+
+            setUserProjects(prevProjects =>
+                prevProjects.map(project =>
                     project.project_id === selectedProject.project_id
                         ? { ...project, ...updatedFields }
                         : project
                 )
             );
+
+            setProjectTechnologies(prev => ({
+                ...prev,
+                [selectedProject.project_id]: pendingTechnologies[selectedProject.project_id].map(tech => ({
+                    id: tech.id,
+                    name: tech.name || getTechnologyInfo(tech.id)?.name
+                }))
+            }));
+
             closeModal();
         } catch (err) {
-            console.error("Error saving project changes:", err);
+            console.error("Error saving changes:", err);
             setError("Failed to save changes.");
         } finally {
             setLoading(false);
@@ -88,7 +148,6 @@ function MyProjects({ userId }) {
 
     return (
         <div className="flex h-full">
-            {/* Left Side: Projects Created by User */}
             <div className="w-1/2 p-6 border-r border-gray-300">
                 <h1 className="text-2xl font-bold mb-4">Projects Created by You</h1>
                 <Link to={`/add-project/${userId}`}>
@@ -110,6 +169,27 @@ function MyProjects({ userId }) {
                                     <p>Status: {project.status}</p>
                                     <p>Start Date: {project.start_date}</p>
                                     <p>End Date: {project.end_date}</p>
+                                    {/* Replace the technologies display section in the project list with this */}
+                                    <div className="mt-2">
+                                        <p className="font-semibold">Technologies:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {projectTechnologies[project.project_id] ? (
+                                                projectTechnologies[project.project_id].map((tech, index) => {
+                                                    const fullTechInfo = getTechnologyInfo(tech.id);
+                                                    return (
+                                                        <span
+                                                            key={index}
+                                                            className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                                                        >
+                                                            {tech.name || (fullTechInfo && fullTechInfo.name) || 'Unknown'}
+                                                        </span>
+                                                    );
+                                                })
+                                            ) : (
+                                                <p className="text-gray-500">No technologies specified</p>
+                                            )}
+                                        </div>
+                                    </div>
                                     {project.github_link && (
                                         <button
                                             onClick={() => window.open(project.github_link, "_blank")}
@@ -133,17 +213,10 @@ function MyProjects({ userId }) {
                 </div>
             </div>
 
-            {/* Right Side: Placeholder for Other Content */}
-            <div className="w-1/2 p-6">
-                <h1 className="text-2xl font-bold mb-4">Other Side Content</h1>
-                <p>Placeholder for additional content to be defined later.</p>
-            </div>
-
-            {/* Edit Modal */}
-            {/* Edit Modal */}
+            {/* Modal code remains unchanged */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                    <div className="bg-white p-6 rounded shadow-lg w-1/3">
+                    <div className="bg-white p-6 rounded shadow-lg w-2/3 max-h-[90vh] overflow-y-auto">
                         <h2 className="text-xl font-bold mb-4">Edit Project</h2>
                         <form>
                             {/* Name */}
@@ -234,7 +307,66 @@ function MyProjects({ userId }) {
                                 />
                             </label>
 
-                            {/* Modal Actions */}
+                            {/* Technologies Section */}
+                            <div className="mb-4">
+                                <label className="block text-gray-700 font-semibold mb-2">Technologies</label>
+                                <div className="flex gap-4">
+                                    <div className="relative flex-grow">
+                                        <input
+                                            type="text"
+                                            placeholder="Search technologies..."
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            value={searchTerm}
+                                        />
+                                        {searchTerm && (
+                                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
+                                                {allTechnologies
+                                                    .filter(
+                                                        (tech) =>
+                                                            tech.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                                                            !pendingTechnologies[selectedProject?.project_id]?.some((pt) => pt.id === tech.id)
+                                                    )
+                                                    .slice(0, 5)
+                                                    .map((tech) => (
+                                                        <div
+                                                            key={tech.id}
+                                                            className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
+                                                            onClick={() => {
+                                                                handleTechnologyChange(tech);
+                                                                setSearchTerm("");
+                                                            }}
+                                                        >
+                                                            {tech.name}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="w-1/3 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50">
+                                        <label className="block text-gray-700 font-semibold mb-2">Selected Technologies</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {pendingTechnologies[selectedProject?.project_id]?.map((tech) => (
+                                                <span
+                                                    key={tech.id}
+                                                    className="bg-blue-600 text-white px-4 py-2 rounded-full flex items-center"
+                                                >
+                                                    {tech.name}
+                                                    <button
+                                                        type="button"
+                                                        className="ml-2 text-white hover:text-red-500"
+                                                        onClick={() => handleTechnologyChange(tech)}
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="mt-4 flex justify-end">
                                 <button
                                     type="button"
@@ -246,10 +378,7 @@ function MyProjects({ userId }) {
                                 <button
                                     type="button"
                                     onClick={saveChanges}
-                                    className={`py-1 px-3 rounded ${loading
-                                        ? "bg-gray-500 cursor-not-allowed"
-                                        : "bg-blue-500 text-white"
-                                        }`}
+                                    className={`py-1 px-3 rounded ${loading ? "bg-gray-500 cursor-not-allowed" : "bg-blue-500 text-white"}`}
                                     disabled={loading}
                                 >
                                     {loading ? "Saving..." : "Save"}
@@ -259,7 +388,6 @@ function MyProjects({ userId }) {
                     </div>
                 </div>
             )}
-
         </div>
     );
 }
