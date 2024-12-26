@@ -9,7 +9,7 @@ function MyProjects({ userId }) {
     const [selectedProject, setSelectedProject] = useState(null);
     const [updatedFields, setUpdatedFields] = useState({});
     const [loading, setLoading] = useState(false);
-
+    const [allTechnologies, setAllTechnologies] = useState([]);
     useEffect(() => {
         // Fetch projects created by the user
         const fetchProjects = async () => {
@@ -29,6 +29,26 @@ function MyProjects({ userId }) {
         fetchProjects();
     }, [userId]);
 
+    useEffect(() => {
+        const fetchTechnologies = async () => {
+            try {
+                const response = await axios.get("/technologies");
+                const mappedTechnologies = response.data.map(tech => ({
+                    id: tech.id || tech.technology_id || tech.Technology_id,
+                    name: tech.name || tech.technology_name || tech.Technology_Name
+                }));
+                setAllTechnologies(mappedTechnologies);
+            } catch (error) {
+                console.error("Error fetching technologies:", error);
+            }
+        };
+
+        fetchTechnologies();
+    }, []);
+    const getTechnologyInfo = (techId) => {
+        return allTechnologies.find(tech => tech.id === techId) || null;
+    };
+    
     const openModal = (project) => {
         setSelectedProject(project);
         setUpdatedFields({ ...project }); // Populate fields with current project details
