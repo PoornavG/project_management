@@ -187,6 +187,30 @@ def add_project():
     except Exception as e:
         return jsonify({'error': 'An unexpected error occurred.', 'details': str(e)}), 500
 
+@app.route('/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
+    data = request.json
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'message': 'Project not found'}), 404
+
+    try:
+        project.name = data.get('name', project.name)
+        project.description = data.get('description', project.description)
+        project.budget = data.get('budget', project.budget)
+        project.status = data.get('status', project.status)
+        project.students_involved_count = data.get('students_involved_count', project.students_involved_count)
+        project.start_date = data.get('start_date', project.start_date)
+        project.end_date = data.get('end_date', project.end_date)
+        project.github_link = data.get('github_link', project.github_link)
+
+        db.session.commit()
+        return jsonify({'message': 'Project updated successfully!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/departments', methods=['GET'])
 def get_departments():
     departments = Department.query.all()
