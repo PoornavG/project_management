@@ -53,6 +53,7 @@ function MyProjects({ userId }) {
                 console.error("Error fetching technologies:", error);
             }
         };
+
         fetchTechnologies();
     }, []);
 
@@ -75,70 +76,35 @@ function MyProjects({ userId }) {
 
     const fetchProjectTechnologies = async (projectId) => {
         try {
-            // Fetch project technologies
-            const projectTechResponse = await axios.get(`/project_technologies/${projectId}`);
-            const projectTechData = projectTechResponse.data;
-
-            // Fetch all technologies
-            const techResponse = await axios.get("/technologies");
-            const allTechnologies = techResponse.data;
-
-            // Map project technologies with their names
-            const mappedTechData = projectTechData.map(projTech => {
-                const matchingTech = allTechnologies.find(tech =>
-                    tech.Technology_id === projTech.technology_id
-                );
-                return {
-                    id: projTech.technology_id,
-                    name: matchingTech ? matchingTech.Technology_Name : 'Unnamed Technology',
-                };
-            });
-
-            console.log("Mapped Project Technologies:", mappedTechData);
-
-            // Set state with the mapped data
+            const response = await axios.get(`/project_technologies/${projectId}`);
+            const mappedTechData = response.data.map(tech => ({
+                id: tech.id || tech.technology_id || tech.Technology_id,
+                name: tech.name || tech.technology_name || tech.Technology_Name || getTechnologyInfo(tech.id)?.name
+            }));
             setProjectTechnologies(prev => ({
                 ...prev,
-                [projectId]: mappedTechData,
+                [projectId]: mappedTechData
             }));
         } catch (error) {
             console.error(`Error fetching technologies for project ${projectId}:`, error);
         }
     };
 
-
     const fetchProjectStudents = async (projectId) => {
         try {
-            // Fetch project students
-            const projectStudentsResponse = await axios.get(`/project_students/${projectId}`);
-            const projectStudentsData = projectStudentsResponse.data;
-
-            // Fetch all students with their USNs
-            const studentsResponse = await axios.get("/studentsidusn");
-            const allStudents = studentsResponse.data;
-
-            // Map project students with their USNs
-            const studentIdToUsnMap = Object.fromEntries(
-                allStudents.map(student => [student.student_id, student.usn || student.USN])
-            );
-
-            const mappedStudentData = projectStudentsData.map(projStudent => ({
-                id: projStudent.student_id,
-                usn: studentIdToUsnMap[projStudent.student_id] || 'Unknown USN',
+            const response = await axios.get(`/project_students/${projectId}`);
+            const mappedStudentData = response.data.map(student => ({
+                id: student.student_id,
+                usn: student.usn,
             }));
-
-            console.log("Mapped Project Students:", mappedStudentData);
-
-            // Set state with the mapped data
             setProjectStudents(prev => ({
                 ...prev,
-                [projectId]: mappedStudentData,
+                [projectId]: mappedStudentData
             }));
         } catch (error) {
             console.error(`Error fetching students for project ${projectId}:`, error);
         }
     };
-
 
     const getTechnologyInfo = (techId) => {
         return allTechnologies.find(tech => tech.id === techId) || null;
@@ -244,7 +210,6 @@ function MyProjects({ userId }) {
     };
 
     return (
-
         <div className="flex justify-center min-h-screen bg-white">
             <div className="w-1/2 p-8">
                 <h1 className="text-2xl font-bold mb-6">Projects Created by You</h1>
@@ -259,53 +224,64 @@ function MyProjects({ userId }) {
                         <p className="text-red-500">{error}</p>
                     ) : userProjects.length > 0 ? (
                         <ul>
-                            {
-                                userProjects.map((project) => (
-                                    <li key={project.project_id} className="border p-2 mb-2">
-                                        <h3 className="font-bold">{project.name}</h3>
-                                        <p>{project.description}</p>
-                                        <p>Budget: {project.budget}</p>
-                                        <p>Status: {project.status}</p>
-                                        <p>Start Date: {project.start_date}</p>
-                                        <p>End Date: {project.end_date}</p>
+                            {userProjects.map((project) => (
+                                <li key={project.project_id} className="border p-2 mb-2">
+                                    <h3 className="font-bold">{project.name}</h3>
+                                    <p>{project.description}</p>
+                                    <p>Budget: {project.budget}</p>
+                                    <p>Status: {project.status}</p>
+                                    <p>Start Date: {project.start_date}</p>
+                                    <p>End Date: {project.end_date}</p>
+                                    <div className="mt-2">
+                                        <p className="font-semibold">Technologies:</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {projectTechnologies[project.project_id]?.map((tech, index) => (
-                                                <span
-                                                    key={tech.id} // Changed from index to tech.id for better React key handling
-                                                    className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
-                                                >
-                                                    {tech.name || tech.technology_name || tech.Technology_Name}
-                                                </span>
-                                            ))}
+                                            {projectTechnologies[project.project_id]?.length > 0 ? (
+                                                projectTechnologies[project.project_id].map((tech, index) => (
+                                                    <span
+                                                        key={index}
+                                                        className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                                                    >
+                                                        {tech.name}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <p className="text-gray-500">No technologies specified</p>
+                                            )}
                                         </div>
-
-                                        {/* For Students Display */}
+                                    </div>
+                                    <div className="mt-2">
+                                        <p className="font-semibold">Students:</p>
                                         <div className="flex flex-wrap gap-2">
-                                            {projectStudents[project.project_id]?.map((student, index) => (
-                                                <span
-                                                    key={student.id} // Changed from index to student.id
-                                                    className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
-                                                >
-                                                    {student.usn || student.USN} {/* Added fallback for possible case variations */}
-                                                </span>
-                                            ))}
+                                            {projectStudents[project.project_id]?.length > 0 ? (
+                                                projectStudents[project.project_id].map((student, index) => (
+                                                    <span
+                                                        key={index}
+                                                        className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                                                    >
+                                                        {student.usn}
+                                                    </span>
+                                                ))
+                                            ) : (
+                                                <p className="text-gray-500">No students specified</p>
+                                            )}
                                         </div>
-                                        {project.github_link && (
-                                            <button
-                                                onClick={() => window.open(project.github_link, "_blank")}
-                                                className="text-blue-500 underline"
-                                            >
-                                                GitHub Link
-                                            </button>
-                                        )}
+                                    </div>
+                                    {project.github_link && (
                                         <button
-                                            onClick={() => openModal(project)}
-                                            className="bg-green-500 text-white py-1 px-3 rounded mt-2"
+                                            onClick={() => window.open(project.github_link, "_blank")}
+                                            className="text-blue-500 underline"
                                         >
-                                            Edit
+                                            GitHub Link
                                         </button>
-                                    </li>
-                                ))}
+                                    )}
+                                    <button
+                                        onClick={() => openModal(project)}
+                                        className="bg-green-500 text-white py-1 px-3 rounded mt-2"
+                                    >
+                                        Edit
+                                    </button>
+                                </li>
+                            ))}
                         </ul>
                     ) : (
                         <p>No projects created by you yet.</p>

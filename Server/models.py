@@ -74,6 +74,7 @@ class Student(db.Model):
     github_profile = db.Column(db.String(255))
     image = db.Column(db.LargeBinary)
     student_technologies = db.relationship('StudentTechnology', back_populates='student')
+    project_students = db.relationship('ProjectStudent', back_populates='student')
 
 class Project(db.Model):
     __tablename__ = 'projects'
@@ -93,12 +94,14 @@ class Project(db.Model):
     # Relationships
     owner = db.relationship('User', backref='projects')
     project_technologies = db.relationship('ProjectTechnology', back_populates='project')
-
+    project_students = db.relationship('ProjectStudent', back_populates='project')
 # Project-Students Table (Many-to-Many Relationship)
 class ProjectStudent(db.Model):
-    __tablename__ = 'Project_Students'
-    project_id = db.Column(db.Integer, db.ForeignKey('Projects.project_id'), primary_key=True)
+    __tablename__ = 'project_students'
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.project_id'), primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey('Students.student_id'), primary_key=True)
+    project = db.relationship('Project', back_populates='project_students')
+    student = db.relationship('Student', back_populates='project_students')
 
 # Project-Faculty Table (Many-to-Many Relationship)
 class ProjectFaculty(db.Model):
@@ -124,8 +127,6 @@ class FacultyTechnology(db.Model):
     # Relationships
     faculty = db.relationship('Faculty', back_populates='faculty_technologies')
     technology = db.relationship('Technologies', back_populates='faculty_technologies')
-
-
 
 
 class ProjectTheme(db.Model):

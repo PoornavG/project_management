@@ -25,6 +25,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/student_technologies/, '/student_technologies')
       },
+      '/project_students': {
+        target: 'http://127.0.0.1:8080', // Replace with your Flask backend URL
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/project_students/, 'project_students')
+      },
       '/project_technologies': {
         target: 'http://127.0.0.1:8080', // Replace with your Flask backend URL
         changeOrigin: true,

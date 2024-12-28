@@ -84,6 +84,7 @@ function FacultyPage({ userId }) {
                     name: tech.name || tech.technology_name || tech.Technology_Name
                 }));
                 setAllTechnologies(mappedTechnologies);
+                
             } catch (error) {
                 console.error("Error fetching technologies:", error);
             }
