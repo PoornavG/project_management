@@ -12,10 +12,14 @@ function MyProjects({ userId }) {
     const [allTechnologies, setAllTechnologies] = useState([]);
     const [projectTechnologies, setProjectTechnologies] = useState({});
     const [pendingTechnologies, setPendingTechnologies] = useState({});
+    const [allThemes, setAllThemes] = useState([]);
+    const [projectThemes, setProjectThemes] = useState({});
+    const [pendingThemes, setPendingThemes] = useState({});
     const [allStudents, setAllStudents] = useState([]);
     const [projectStudents, setProjectStudents] = useState({});
     const [pendingStudents, setPendingStudents] = useState({});
     const [searchTerm, setSearchTerm] = useState("");
+    const [themeSearchTerm, setThemeSearchTerm] = useState("");
     const [studentSearchTerm, setStudentSearchTerm] = useState(""); // New state for student search
 
     useEffect(() => {
@@ -27,6 +31,7 @@ function MyProjects({ userId }) {
                     response.data.forEach(project => {
                         fetchProjectTechnologies(project.project_id);
                         fetchProjectStudents(project.project_id);
+                        fetchProjectThemes(project.project_id);
                     });
                 } else {
                     throw new Error("Unexpected response format.");
@@ -55,7 +60,22 @@ function MyProjects({ userId }) {
         };
         fetchTechnologies();
     }, []);
+    useEffect(() => {
+        const fetchThemes = async () => {
+            try {
+                const response = await axios.get("/themes");
+                const mappedThemes = response.data.map(theme => ({
+                    id: theme.id || theme.theme_id || theme.Theme_id,
+                    name: theme.name || theme.theme_name || theme.Theme_Name
+                }));
+                setAllThemes(mappedThemes);
 
+            } catch (error) {
+                console.error("Error fetching Themes:", error);
+            }
+        };
+        fetchThemes();
+    }, []);
     useEffect(() => {
         const fetchStudents = async () => {
             try {
@@ -72,6 +92,7 @@ function MyProjects({ userId }) {
 
         fetchStudents();
     }, []);
+
 
     const fetchProjectTechnologies = async (projectId) => {
         try {
@@ -103,6 +124,39 @@ function MyProjects({ userId }) {
             }));
         } catch (error) {
             console.error(`Error fetching technologies for project ${projectId}:`, error);
+        }
+    };
+
+    const fetchProjectThemes = async (projectId) => {
+        try {
+            // Fetch project themes
+            const projectThemeResponse = await axios.get(`/project_themes/${projectId}`);
+            const projectThemeData = projectThemeResponse.data;
+
+            // Fetch all themes
+            const themeResponse = await axios.get("/themes");
+            const allThemes = themeResponse.data;
+
+            // Map project themes with their names
+            const mappedThemeData = projectThemeData.map(projTheme => {
+                const matchingTheme = allThemes.find(theme =>
+                    theme.Theme_id === projTheme.theme_id
+                );
+                return {
+                    id: projTheme.theme_id,
+                    name: matchingTheme ? matchingTheme.Theme_Name : 'Unnamed Theme',
+                };
+            });
+
+            console.log("Mapped Project Themes:", mappedThemeData);
+
+            // Set state with the mapped data
+            setProjectThemes(prev => ({
+                ...prev,
+                [projectId]: mappedThemeData,
+            }));
+        } catch (error) {
+            console.error(`Error fetching themes for project ${projectId}:`, error);
         }
     };
 
@@ -155,6 +209,10 @@ function MyProjects({ userId }) {
             ...pendingStudents,
             [project.project_id]: projectStudents[project.project_id] || []
         });
+        setPendingThemes({
+            ...pendingThemes,
+            [project.project_id]: projectThemes[project.project_id] || []
+        });
         setIsModalOpen(true);
     };
 
@@ -164,6 +222,7 @@ function MyProjects({ userId }) {
         setUpdatedFields({});
         setSearchTerm("");
         setStudentSearchTerm("");
+        setThemeSearchTerm("");
     };
 
     const handleFieldChange = (e) => {
@@ -186,6 +245,23 @@ function MyProjects({ userId }) {
             [projectId]: updatedTechnologies
         }));
     };
+
+    const handleThemeChange = (selectedTheme) => {
+        if (!selectedProject) return;
+
+        const projectId = selectedProject.project_id;
+        const currentThemes = pendingThemes[projectId] || [];
+
+        const updatedThemes = currentThemes.some(theme => theme.id === selectedTheme.id)
+            ? currentThemes.filter(theme => theme.id !== selectedTheme.id)
+            : [...currentThemes, selectedTheme];
+
+        setPendingThemes(prev => ({
+            ...prev,
+            [projectId]: updatedThemes
+        }));
+    };
+
 
     const handleStudentChange = (selectedStudent) => {
         if (!selectedProject) return;
@@ -212,6 +288,9 @@ function MyProjects({ userId }) {
                 technology_ids: pendingTechnologies[selectedProject.project_id].map(tech => tech.id)
             });
 
+            await axios.put(`/project_themes/${selectedProject.project_id}`, {
+                theme_ids: pendingThemes[selectedProject.project_id].map(theme => theme.id)
+            });
             await axios.put(`/project_students/${selectedProject.project_id}`, {
                 student_ids: pendingStudents[selectedProject.project_id].map(student => student.id)
             });
@@ -227,6 +306,11 @@ function MyProjects({ userId }) {
             setProjectTechnologies(prev => ({
                 ...prev,
                 [selectedProject.project_id]: pendingTechnologies[selectedProject.project_id]
+            }));
+
+            setProjectThemes(prev => ({
+                ...prev,
+                [selectedProject.project_id]: pendingThemes[selectedProject.project_id]
             }));
 
             setProjectStudents(prev => ({
@@ -268,6 +352,7 @@ function MyProjects({ userId }) {
                                         <p>Status: {project.status}</p>
                                         <p>Start Date: {project.start_date}</p>
                                         <p>End Date: {project.end_date}</p>
+                                        <p>Technologies</p>
                                         <div className="flex flex-wrap gap-2">
                                             {projectTechnologies[project.project_id]?.map((tech, index) => (
                                                 <span
@@ -278,8 +363,20 @@ function MyProjects({ userId }) {
                                                 </span>
                                             ))}
                                         </div>
-
+                                        <p>Themes:</p>
+                                        {/*For theme display*/}
+                                        <div className="flex flex-wrap gap-2">
+                                            {projectThemes[project.project_id]?.map((theme, index) => (
+                                                <span
+                                                    key={theme.id} // Changed from index to tech.id for better React key handling
+                                                    className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                                                >
+                                                    {theme.name || theme.theme_name || theme.Theme_Name}
+                                                </span>
+                                            ))}
+                                        </div>
                                         {/* For Students Display */}
+                                        <p>Students:</p>
                                         <div className="flex flex-wrap gap-2">
                                             {projectStudents[project.project_id]?.map((student, index) => (
                                                 <span
@@ -449,6 +546,65 @@ function MyProjects({ userId }) {
                                                         type="button"
                                                         className="ml-2 text-white hover:text-red-500"
                                                         onClick={() => handleTechnologyChange(tech)}
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mb-4">
+                                <label className="block text-gray-700 font-semibold mb-2">Themes</label>
+                                <div className="flex gap-4">
+                                    <div className="relative flex-grow">
+                                        <input
+                                            type="text"
+                                            placeholder="Search themes..."
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            onChange={(e) => setThemeSearchTerm(e.target.value)}
+                                            value={themeSearchTerm}
+                                        />
+                                        {themeSearchTerm && (
+                                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
+                                                {allThemes
+                                                    .filter(
+                                                        (theme) =>
+                                                            theme.name.toLowerCase().includes(themeSearchTerm.toLowerCase()) &&
+                                                            !pendingThemes[selectedProject?.project_id]?.some((pt) => pt.id === theme.id)
+                                                    )
+                                                    .slice(0, 5)
+                                                    .map((theme) => (
+                                                        <div
+                                                            key={theme.id}
+                                                            className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
+                                                            onClick={() => {
+                                                                handleThemeChange(theme);
+                                                                setThemeSearchTerm("");
+                                                            }}
+                                                        >
+                                                            {theme.name}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="w-1/3 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50">
+                                        <label className="block text-gray-700 font-semibold mb-2">Selected Themes</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {pendingThemes[selectedProject?.project_id]?.map((theme) => (
+                                                <span
+                                                    key={theme.id}
+                                                    className="bg-blue-600 text-white px-4 py-2 rounded-full flex items-center"
+                                                >
+                                                    {theme.name}
+                                                    <button
+                                                        type="button"
+                                                        className="ml-2 text-white hover:text-red-500"
+                                                        onClick={() => handleThemeChange(theme)}
                                                     >
                                                         ✕
                                                     </button>

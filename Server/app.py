@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from flask_cors import CORS
-from models import db, User, Project, Department,Technologies,themes,Faculty,Student,StudentTechnology,FacultyTechnology,ProjectTechnology,ProjectStudent
+from models import db, User, Project, Department,Technologies,themes,Faculty,Student,StudentTechnology,FacultyTechnology,ProjectTechnology,ProjectStudent,ProjectTheme
 import pymysql
 from flask_bcrypt import Bcrypt
 
@@ -590,7 +590,51 @@ def update_project_technologies_put(project_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500    
-    
+
+@app.route('/project_themes/<int:project_id>', methods=['PUT'])
+def update_project_themes_put(project_id):
+    try:
+        data = request.get_json()
+        theme_ids = data.get('theme_ids')  # Accept an array of technology IDs
+
+        if not theme_ids:
+            return jsonify({"error": "theme_ids are required"}), 400
+
+        if not isinstance(theme_ids, list) or not all(isinstance(t_id, int) for t_id in theme_ids):
+            return jsonify({"error": "theme_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_themes = themes.query.filter(themes.theme_id.in_(theme_ids)).all()
+        if len(valid_themes) != len(theme_ids):
+            return jsonify({"error": "Some themes IDs are invalid"}), 400
+
+        # Clear existing technologies for the faculty
+        ProjectTheme.query.filter_by(project_id=project_id).delete()
+
+        # Add new faculty-technology entries
+        new_entries = [
+            ProjectTheme(project_id=project_id, theme_id=theme_id)
+            for theme_id in theme_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_themes = ProjectTheme.query.filter_by(project_id=project_id).all()
+        return jsonify({
+            "message": "Project theme updated successfully",
+            "themes": [{"id": t.theme_id, "name": t.theme.name} for t in updated_themes]
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
+
 @app.route('/project_students/<int:project_id>', methods=['PUT'])
 def update_project_students_put(project_id):
     try:
@@ -650,7 +694,10 @@ def get_project_technologies(project_id):
     technologies = ProjectTechnology.query.filter_by(project_id=project_id).all()
     return jsonify([{"project_id": tech.project_id, "technology_id": tech.technology_id} for tech in technologies]), 200
   
-
+@app.route('/project_themes/<int:project_id>', methods=['GET'])
+def get_project_themes(project_id):
+    themes = ProjectTheme.query.filter_by(project_id=project_id).all()
+    return jsonify([{"project_id": tech.project_id, "theme_id": tech.theme_id} for tech in themes]), 200
 
 @app.route('/project_students/<int:project_id>', methods=['GET'])
 def get_project_students(project_id):

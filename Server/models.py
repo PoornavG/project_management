@@ -32,7 +32,7 @@ class themes(db.Model):
     __tablename__='themes'
     theme_id=db.Column(db.Integer,primary_key=True)
     name=db.Column(db.String(255),unique=True,nullable=False)
-    
+    project_themes = db.relationship('ProjectTheme', back_populates='theme')
 
 # Project-Departments Table (Many-to-Many Relationship)
 class ProjectDepartment(db.Model):
@@ -90,10 +90,10 @@ class Project(db.Model):
     github_link = db.Column(db.String(255))
     image = db.Column(db.LargeBinary)
     owner_id = db.Column(db.Integer, db.ForeignKey('Users.user_id'), nullable=False)
-
     # Relationships
     owner = db.relationship('User', backref='projects')
     project_technologies = db.relationship('ProjectTechnology', back_populates='project')
+    project_themes = db.relationship('ProjectTheme', back_populates='project')
     project_students = db.relationship('ProjectStudent', back_populates='project')
 # Project-Students Table (Many-to-Many Relationship)
 class ProjectStudent(db.Model):
@@ -133,6 +133,8 @@ class ProjectTheme(db.Model):
     __tablename__ = 'project_themes'
     project_id = db.Column(db.Integer, db.ForeignKey('projects.project_id'), primary_key=True)
     theme_id = db.Column(db.Integer, db.ForeignKey('themes.theme_id'), primary_key=True)
+    project = db.relationship('Project', back_populates='project_themes')
+    theme = db.relationship('themes', back_populates='project_themes')
 
 class ProjectTechnology(db.Model):
     __tablename__ = 'project_technologies'
