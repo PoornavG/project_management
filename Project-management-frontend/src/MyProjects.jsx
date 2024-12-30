@@ -18,10 +18,13 @@ function MyProjects({ userId }) {
     const [allStudents, setAllStudents] = useState([]);
     const [projectStudents, setProjectStudents] = useState({});
     const [pendingStudents, setPendingStudents] = useState({});
+    const [allFacultys, setAllFacultys] = useState([]);
+    const [projectFacultys, setProjectFacultys] = useState({});
+    const [pendingFacultys, setPendingFacultys] = useState({});
     const [searchTerm, setSearchTerm] = useState("");
     const [themeSearchTerm, setThemeSearchTerm] = useState("");
     const [studentSearchTerm, setStudentSearchTerm] = useState(""); // New state for student search
-
+    const [facultySearchTerm, setFacultySearchTerm] = useState("");
     useEffect(() => {
         const fetchProjects = async () => {
             try {
@@ -31,6 +34,7 @@ function MyProjects({ userId }) {
                     response.data.forEach(project => {
                         fetchProjectTechnologies(project.project_id);
                         fetchProjectStudents(project.project_id);
+                        fetchProjectFacultys(project.project_id);
                         fetchProjectThemes(project.project_id);
                     });
                 } else {
@@ -91,6 +95,22 @@ function MyProjects({ userId }) {
         };
 
         fetchStudents();
+    }, []);
+    useEffect(() => {
+        const fetchFacultys = async () => {
+            try {
+                const response = await axios.get("/facultyidname");
+                const mappedFacultys = response.data.map(faculty => ({
+                    id: faculty.faculty_id,
+                    name: faculty.name,
+                }));
+                setAllFacultys(mappedFacultys);
+            } catch (error) {
+                console.error("Error fetching facultys:", error);
+            }
+        };
+
+        fetchFacultys();
     }, []);
 
 
@@ -193,6 +213,37 @@ function MyProjects({ userId }) {
         }
     };
 
+    const fetchProjectFacultys = async (projectId) => {
+        try {
+            // Fetch project Facultys
+            const projectFacultysResponse = await axios.get(`/project_faculty/${projectId}`);
+            const projectFacultysData = projectFacultysResponse.data;
+
+            // Fetch all Facultys with their USNs
+            const facultysResponse = await axios.get("/facultyidname");
+            const allFacultys = facultysResponse.data;
+
+            // Map project facultys with their USNs
+            const facultyIdToUsnMap = Object.fromEntries(
+                allFacultys.map(faculty => [faculty.faculty_id, faculty.name || faculty.USN])
+            );
+
+            const mappedFacultyData = projectFacultysData.map(projFaculty => ({
+                id: projFaculty.faculty_id,
+                name: facultyIdToUsnMap[projFaculty.faculty_id] || 'Unknown Name',
+            }));
+
+            console.log("Mapped Project Facultys:", mappedFacultyData);
+
+            // Set state with the mapped data
+            setProjectFacultys(prev => ({
+                ...prev,
+                [projectId]: mappedFacultyData,
+            }));
+        } catch (error) {
+            console.error(`Error fetching facultys for project ${projectId}:`, error);
+        }
+    };
 
     const getTechnologyInfo = (techId) => {
         return allTechnologies.find(tech => tech.id === techId) || null;
@@ -209,6 +260,10 @@ function MyProjects({ userId }) {
             ...pendingStudents,
             [project.project_id]: projectStudents[project.project_id] || []
         });
+        setPendingFacultys({
+            ...pendingFacultys,
+            [project.project_id]: projectFacultys[project.project_id] || []
+        });
         setPendingThemes({
             ...pendingThemes,
             [project.project_id]: projectThemes[project.project_id] || []
@@ -222,6 +277,7 @@ function MyProjects({ userId }) {
         setUpdatedFields({});
         setSearchTerm("");
         setStudentSearchTerm("");
+        setFacultySearchTerm("");
         setThemeSearchTerm("");
     };
 
@@ -279,6 +335,22 @@ function MyProjects({ userId }) {
         }));
     };
 
+    const handleFacultyChange = (selectedFaculty) => {
+        if (!selectedProject) return;
+
+        const projectId = selectedProject.project_id;
+        const currentFacultys = pendingFacultys[projectId] || [];
+
+        const updatedFacultys = currentFacultys.some(faculty => faculty.id === selectedFaculty.id)
+            ? currentFacultys.filter(faculty => faculty.id !== selectedFaculty.id)
+            : [...currentFacultys, selectedFaculty];
+
+        setPendingFacultys(prev => ({
+            ...prev,
+            [projectId]: updatedFacultys
+        }));
+    };
+
     const saveChanges = async () => {
         setLoading(true);
         try {
@@ -293,6 +365,9 @@ function MyProjects({ userId }) {
             });
             await axios.put(`/project_students/${selectedProject.project_id}`, {
                 student_ids: pendingStudents[selectedProject.project_id].map(student => student.id)
+            });
+            await axios.put(`/project_faculty/${selectedProject.project_id}`, {
+                faculty_ids: pendingFacultys[selectedProject.project_id].map(faculty => faculty.id)
             });
 
             setUserProjects(prevProjects =>
@@ -317,6 +392,10 @@ function MyProjects({ userId }) {
                 ...prev,
                 [selectedProject.project_id]: pendingStudents[selectedProject.project_id]
             }));
+            setProjectFacultys(prev => ({
+                ...prev,
+                [selectedProject.project_id]: pendingFacultys[selectedProject.project_id]
+            }));
 
             closeModal();
         } catch (err) {
@@ -329,83 +408,112 @@ function MyProjects({ userId }) {
 
     return (
 
-        <div className="flex justify-center min-h-screen bg-white">
-            <div className="w-1/2 p-8">
-                <h1 className="text-2xl font-bold mb-6">Projects Created by You</h1>
+        <div className="flex justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+            <div className="w-3/4 p-8">
+                <h1 className="text-3xl font-bold mb-6 text-gray-800">Projects Created by You</h1>
                 <Link to={`/add-project/${userId}`}>
-                    <button className="bg-blue-500 text-white py-2 px-4 rounded mb-4">
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded-lg mb-6 transition-colors duration-200 shadow-sm">
                         Add New Project
                     </button>
                 </Link>
                 <div>
-                    <h2 className="text-xl font-semibold mb-4">Project List</h2>
+                    <h2 className="text-2xl font-semibold mb-4 text-gray-700">Project List</h2>
                     {error ? (
-                        <p className="text-red-500">{error}</p>
+                        <p className="text-red-500 p-4 bg-red-50 rounded-lg">{error}</p>
                     ) : userProjects.length > 0 ? (
-                        <ul>
+                        <ul className="space-y-6">
                             {
                                 userProjects.map((project) => (
-                                    <li key={project.project_id} className="border p-2 mb-2">
-                                        <h3 className="font-bold">{project.name}</h3>
-                                        <p>{project.description}</p>
-                                        <p>Budget: {project.budget}</p>
-                                        <p>Status: {project.status}</p>
-                                        <p>Start Date: {project.start_date}</p>
-                                        <p>End Date: {project.end_date}</p>
-                                        <p>Technologies</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {projectTechnologies[project.project_id]?.map((tech, index) => (
-                                                <span
-                                                    key={tech.id} // Changed from index to tech.id for better React key handling
-                                                    className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
-                                                >
-                                                    {tech.name || tech.technology_name || tech.Technology_Name}
-                                                </span>
-                                            ))}
+                                    <li key={project.project_id} className="border border-gray-200 rounded-lg p-6 bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
+                                        <h3 className="text-xl font-bold text-gray-800 mb-4">{project.name}</h3>
+                                        <p className="text-gray-600 mb-3 break-words">{project.description}</p>
+                                        <p className="text-gray-700 mb-2"><span className="font-semibold">Budget:</span> {project.budget}</p>
+                                        <p className="text-gray-700 mb-2">
+                                            <span className="font-semibold">Status:</span>
+                                            <span className="ml-2 inline-block px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
+                                                {project.status}
+                                            </span>
+                                        </p>
+                                        <p className="text-gray-700 mb-2"><span className="font-semibold">Start Date:</span> {project.start_date}</p>
+                                        <p className="text-gray-700 mb-4"><span className="font-semibold">End Date:</span> {project.end_date}</p>
+                                        <div className="space-y-4">
+                                            <div>
+                                                <p className="font-semibold text-gray-700 mb-2">Technologies:</p>
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {projectTechnologies[project.project_id]?.map((tech) => (
+                                                        <span
+                                                            key={tech.id}
+                                                            className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+                                                        >
+                                                            {tech.name || tech.technology_name || tech.Technology_Name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="font-semibold text-gray-700 mb-2">Themes:</p>
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {projectThemes[project.project_id]?.map((theme) => (
+                                                        <span
+                                                            key={theme.id}
+                                                            className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm"
+                                                        >
+                                                            {theme.name || theme.theme_name || theme.Theme_Name}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="font-semibold text-gray-700 mb-2">Students:</p>
+                                                <div className="flex flex-wrap gap-2 mb-3">
+                                                    {projectStudents[project.project_id]?.map((student) => (
+                                                        <span
+                                                            key={student.id}
+                                                            className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm"
+                                                        >
+                                                            {student.usn || student.USN}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <p className="font-semibold text-gray-700 mb-2">Faculty:</p>
+                                                <div className="flex flex-wrap gap-2 mb-4">
+                                                    {projectFacultys[project.project_id]?.map((faculty) => (
+                                                        <span
+                                                            key={faculty.id}
+                                                            className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm"
+                                                        >
+                                                            {faculty.name || faculty.NAME}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p>Themes:</p>
-                                        {/*For theme display*/}
-                                        <div className="flex flex-wrap gap-2">
-                                            {projectThemes[project.project_id]?.map((theme, index) => (
-                                                <span
-                                                    key={theme.id} // Changed from index to tech.id for better React key handling
-                                                    className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
+                                        <div className="flex gap-3 mt-4">
+                                            {project.github_link && (
+                                                <button
+                                                    onClick={() => window.open(project.github_link, "_blank")}
+                                                    className="text-blue-600 hover:text-blue-800 underline transition-colors duration-200"
                                                 >
-                                                    {theme.name || theme.theme_name || theme.Theme_Name}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        {/* For Students Display */}
-                                        <p>Students:</p>
-                                        <div className="flex flex-wrap gap-2">
-                                            {projectStudents[project.project_id]?.map((student, index) => (
-                                                <span
-                                                    key={student.id} // Changed from index to student.id
-                                                    className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm"
-                                                >
-                                                    {student.usn || student.USN} {/* Added fallback for possible case variations */}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        {project.github_link && (
+                                                    GitHub Link
+                                                </button>
+                                            )}
                                             <button
-                                                onClick={() => window.open(project.github_link, "_blank")}
-                                                className="text-blue-500 underline"
+                                                onClick={() => openModal(project)}
+                                                className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors duration-200"
                                             >
-                                                GitHub Link
+                                                Edit
                                             </button>
-                                        )}
-                                        <button
-                                            onClick={() => openModal(project)}
-                                            className="bg-green-500 text-white py-1 px-3 rounded mt-2"
-                                        >
-                                            Edit
-                                        </button>
+                                        </div>
                                     </li>
                                 ))}
                         </ul>
                     ) : (
-                        <p>No projects created by you yet.</p>
+                        <p className="text-gray-600 p-4 bg-gray-50 rounded-lg">No projects created by you yet.</p>
                     )}
                 </div>
             </div>
@@ -674,6 +782,70 @@ function MyProjects({ userId }) {
                                     </div>
                                 </div>
                             </div>
+
+                            {/*Faculty section*/}
+                            <div className="mb-4">
+                                <label className="block text-gray-700 font-semibold mb-2">Faculty</label>
+                                <div className="flex gap-4">
+                                    {/* Faculty Search Input */}
+                                    <div className="relative flex-grow">
+                                        <input
+                                            type="text"
+                                            placeholder="Search faculty..."
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                            onChange={(e) => setFacultySearchTerm(e.target.value)}
+                                            value={facultySearchTerm}
+                                        />
+                                        {/* Dropdown Suggestions */}
+                                        {facultySearchTerm && (
+                                            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
+                                                {allFacultys
+                                                    ?.filter(
+                                                        (faculty) =>
+                                                            faculty.name.toLowerCase().includes(facultySearchTerm.toLowerCase()) &&
+                                                            !pendingFacultys[selectedProject?.project_id]?.some((ps) => ps.id === faculty.id)
+                                                    )
+                                                    .slice(0, 5)
+                                                    .map((faculty) => (
+                                                        <div
+                                                            key={faculty.id}
+                                                            className="px-4 py-2 hover:bg-blue-100 cursor-pointer"
+                                                            onClick={() => {
+                                                                handleFacultyChange(faculty, "add"); // Updated to explicitly add faculty
+                                                                setFacultySearchTerm("");
+                                                            }}
+                                                        >
+                                                            {faculty.name}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Selected Faculty List */}
+                                    <div className="w-1/3 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50">
+                                        <label className="block text-gray-700 font-semibold mb-2">Selected Facultys</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {pendingFacultys[selectedProject?.project_id]?.map((faculty) => (
+                                                <span
+                                                    key={faculty.id}
+                                                    className="bg-blue-600 text-white px-4 py-2 rounded-full flex items-center"
+                                                >
+                                                    {faculty.name}
+                                                    <button
+                                                        type="button"
+                                                        className="ml-2 text-white hover:text-red-500"
+                                                        onClick={() => handleFacultyChange(faculty, "remove")} // Updated to explicitly remove faculty
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
 
                             <div className="mt-4 flex justify-end">
                                 <button

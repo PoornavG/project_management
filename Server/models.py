@@ -55,7 +55,7 @@ class Faculty(db.Model):
     github_profile = db.Column(db.String(255))
     image = db.Column(db.LargeBinary)
     faculty_technologies = db.relationship('FacultyTechnology', back_populates='faculty')
-
+    project_faculty = db.relationship('ProjectFaculty', back_populates='faculty')
 
 
 
@@ -95,7 +95,9 @@ class Project(db.Model):
     project_technologies = db.relationship('ProjectTechnology', back_populates='project')
     project_themes = db.relationship('ProjectTheme', back_populates='project')
     project_students = db.relationship('ProjectStudent', back_populates='project')
+    project_faculty = db.relationship('ProjectFaculty', back_populates='project')
 # Project-Students Table (Many-to-Many Relationship)
+
 class ProjectStudent(db.Model):
     __tablename__ = 'project_students'
     project_id = db.Column(db.Integer, db.ForeignKey('projects.project_id'), primary_key=True)
@@ -105,9 +107,11 @@ class ProjectStudent(db.Model):
 
 # Project-Faculty Table (Many-to-Many Relationship)
 class ProjectFaculty(db.Model):
-    __tablename__ = 'Project_Faculty'
-    project_id = db.Column(db.Integer, db.ForeignKey('Projects.project_id'), primary_key=True)
-    faculty_id = db.Column(db.Integer, db.ForeignKey('Faculty.faculty_id'), primary_key=True)    
+    __tablename__ = 'project_faculty'
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.project_id'), primary_key=True)
+    faculty_id = db.Column(db.Integer, db.ForeignKey('faculty.faculty_id'), primary_key=True)
+    project = db.relationship('Project', back_populates='project_faculty')
+    faculty = db.relationship('Faculty', back_populates='project_faculty')    
 
 class StudentTechnology(db.Model):
     __tablename__ = 'student_technologies'

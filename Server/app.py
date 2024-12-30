@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from flask_cors import CORS
-from models import db, User, Project, Department,Technologies,themes,Faculty,Student,StudentTechnology,FacultyTechnology,ProjectTechnology,ProjectStudent,ProjectTheme
+from models import db, User, Project, Department,Technologies,themes,Faculty,Student,StudentTechnology,FacultyTechnology,ProjectTechnology,ProjectStudent,ProjectTheme,ProjectFaculty
 import pymysql
 from flask_bcrypt import Bcrypt
 
@@ -132,6 +132,14 @@ def get_projects():
         'owner_id':project.owner_id
     } for project in projects])
 
+@app.route('/projectsidname', methods=['GET'])
+def get_projectsidname():
+    projects = Project.query.all()
+    return jsonify([{
+        'project_id': project.project_id,
+        'name': project.name,
+    } for project in projects])
+
 @app.route('/projectsown/<int:owner_id>', methods=['GET'])
 def get_projects_by_owner(owner_id):
     # Query all projects with the specified owner_id
@@ -240,6 +248,14 @@ def get_faculty():
         'phone_no': faculty.phone_no,
         'linkedin_profile': faculty.linkedin_profile,
         'github_profile': faculty.github_profile
+    } for faculty in faculty_members])
+
+@app.route('/facultyidname', methods=['GET'])
+def get_facultyidname():
+    faculty_members = Faculty.query.all()
+    return jsonify([{
+        'faculty_id': faculty.faculty_id,
+        'name': faculty.name,
     } for faculty in faculty_members])
 
 @app.route('/faculty/<int:user_id>', methods=['GET'])
@@ -678,6 +694,49 @@ def update_project_students_put(project_id):
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500  
     
+@app.route('/project_faculty/<int:project_id>', methods=['PUT'])
+def update_project_faculty_put(project_id):
+    try:
+        data = request.get_json()
+        faculty_ids = data.get('faculty_ids')  # Accept an array of technology IDs
+
+        if not faculty_ids:
+            return jsonify({"error": "faculty_ids are required"}), 400
+
+        if not isinstance(faculty_ids, list) or not all(isinstance(t_id, int) for t_id in faculty_ids):
+            return jsonify({"error": "faculty_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_faculty = Faculty.query.filter(Faculty.faculty_id.in_(faculty_ids)).all()
+        if len(valid_faculty) != len(faculty_ids):
+            return jsonify({"error": "Some faculty IDs are invalid"}), 400
+
+        # Clear existing technologies for the faculty
+        ProjectFaculty.query.filter_by(project_id=project_id).delete()
+
+        # Add new faculty-technology entries
+        new_entries = [
+            ProjectFaculty(project_id=project_id, faculty_id=faculty_id)
+            for faculty_id in faculty_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_facultys = ProjectFaculty.query.filter_by(project_id=project_id).all()
+        return jsonify({
+            "message": "Project facultys updated successfully",
+            "facultys": [{"id": t.faculty_id, "name": t.faculty.name} for t in updated_facultys]
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+        
 # GET: Retrieve all technologies for a faculty
 @app.route('/faculty_technologies/<int:faculty_id>', methods=['GET'])
 def get_faculty_technologies(faculty_id):
@@ -703,6 +762,12 @@ def get_project_themes(project_id):
 def get_project_students(project_id):
     students = ProjectStudent.query.filter_by(project_id=project_id).all()
     return jsonify([{"project_id": tech.project_id, "student_id": tech.student_id} for tech in students]), 200  
+
+@app.route('/project_faculty/<int:project_id>', methods=['GET'])
+def get_project_faculty(project_id):
+    faculty = ProjectFaculty.query.filter_by(project_id=project_id).all()
+    return jsonify([{"project_id": tech.project_id, "faculty_id": tech.faculty_id} for tech in faculty]), 200  
+
 
 @app.cli.command('initdb')
 def init_db():
