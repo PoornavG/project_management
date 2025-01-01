@@ -9,6 +9,7 @@ import MyProjects from "./MyProjects";
 import AddProject from "./AddProject";
 import ProjectList from "./project-list";
 import StudentList from "./student-list";
+import FacultyList from "./faculty-list";
 function App() {
   const [userId, setUserId] = useState(null); // Tracks the logged-in user's ID
 
@@ -47,6 +48,7 @@ function App() {
           <Route path="/projects-list" element={<ProjectList />} />
 
           <Route path="/student-list" element={<StudentList />} />
+          <Route path="/faculty-list" element={<FacultyList />} />
           <Route path="/myprojects/:userId"
             element={<ProjectWrapper />}
           />
