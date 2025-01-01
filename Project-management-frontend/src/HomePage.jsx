@@ -14,12 +14,12 @@ function HomePage({ userId }) {
                         My Profile
                     </button>
                 </Link>
-                <Link to="/projects" className="w-60">
+                <Link to={`/myprojects/${userId}`} className="w-60">
                     <button className="w-full bg-blue-500 text-white py-2 px-4 rounded mb-4 hover:bg-blue-600">
                         My Projects
                     </button>
                 </Link>
-                <Link to="/students" className="w-60">
+                <Link to="/student-list" className="w-60">
                     <button className="w-full bg-blue-500 text-white py-2 px-4 rounded mb-4 hover:bg-blue-600">
                         Student List
                     </button>

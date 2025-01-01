@@ -25,6 +25,26 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/student_technologies/, '/student_technologies')
       },
+      '/project_students': {
+        target: 'http://127.0.0.1:8080', // Replace with your Flask backend URL
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/project_students/, 'project_students')
+      },
+      '/project_faculty': {
+        target: 'http://127.0.0.1:8080', // Replace with your Flask backend URL
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/project_faculty/, 'project_faculty')
+      },
+      '/project_technologies': {
+        target: 'http://127.0.0.1:8080', // Replace with your Flask backend URL
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/project_technologies/, '/project_technologies')
+      },
+      '/project_themes': {
+        target: 'http://127.0.0.1:8080', // Replace with your Flask backend URL
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/project_themes/, '/project_themes')
+      },
       '/users': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
@@ -39,6 +59,21 @@ export default defineConfig({
         target: 'http://127.0.0.1:8080',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/technologies/, '/technologies') // Optional rewrite
+      },
+      '/themes': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/themes/, '/themes') // Optional rewrite
+      },
+      '/projects': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/projects/, '/projects') // Optional rewrite
+      },
+      '/projectsidname': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/projectsidame/, '/projectsidname') // Optional rewrite
       },
     }
   }

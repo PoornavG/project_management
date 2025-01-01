@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import TechnologyEditor from "./tech_editor";
+
 function FacultyPage({ userId }) {
     const [facultyData, setFacultyData] = useState(null);
     const [departments, setDepartments] = useState([]);
@@ -84,6 +84,7 @@ function FacultyPage({ userId }) {
                     name: tech.name || tech.technology_name || tech.Technology_Name
                 }));
                 setAllTechnologies(mappedTechnologies);
+                
             } catch (error) {
                 console.error("Error fetching technologies:", error);
             }
@@ -98,56 +99,58 @@ function FacultyPage({ userId }) {
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
-        setEditedData(prevData => ({
+        setEditedData((prevData) => ({
             ...prevData,
-            [name]: value
+            [name]: value,
         }));
+    };
+
+    // State for tracking unsaved technology changes
+    const [pendingTechnologies, setPendingTechnologies] = useState(facultyTechnologies);
+
+    const handleTechnologyChange = (selectedTech) => {
+        // Create an updated list of technologies without making an API call yet
+        const updatedTechnologies = pendingTechnologies.some((tech) => tech.id === selectedTech.id)
+            ? pendingTechnologies.filter((tech) => tech.id !== selectedTech.id)
+            : [...pendingTechnologies, selectedTech];
+
+        // Update the pending technologies state
+        setPendingTechnologies(updatedTechnologies);
     };
 
     const handleUpdateProfile = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`/faculty/${userId}`, {
+            // Update profile data
+            const profileResponse = await fetch(`/faculty/${userId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(editedData)
+                body: JSON.stringify(editedData),
             });
 
-            if (response.ok) {
-                setFacultyData(editedData);
-                setIsEditing(false);
-                setError(null);
-                alert('Profile updated successfully!');
+            // Update technologies
+            const techResponse = await axios.put(`/faculty_technologies/${facultyData.faculty_id}`, {
+                technology_ids: pendingTechnologies.map((tech) => tech.id),
+            });
+
+            // Check responses for success
+            if (profileResponse.ok && techResponse.status === 200) {
+                setFacultyData(editedData); // Update profile state
+                setFacultyTechnologies(pendingTechnologies); // Update technology state
+                setIsEditing(false); // Exit editing mode
+                setError(null); // Clear errors
+                alert('Changes saved successfully!');
             } else {
-                const errorData = await response.json();
-                setError(errorData.error || 'Failed to update profile');
+                const errorData = await profileResponse.json();
+                setError(errorData.error || 'Failed to update profile or technologies.');
             }
         } catch (err) {
-            setError("Failed to update faculty data. Please try again later.");
+            setError('Failed to save changes. Please try again later.');
         }
     };
 
-    const handleTechnologyChange = async (selectedTech) => {
-        try {
-            // Create the updated list first
-            const updatedTechnologies = facultyTechnologies.some(tech => tech.id === selectedTech.id)
-                ? facultyTechnologies.filter(tech => tech.id !== selectedTech.id)
-                : [...facultyTechnologies, selectedTech];
-
-            // Make the API call first
-            await axios.put(`/faculty_technologies/${facultyData.faculty_id}`, {
-                technology_ids: updatedTechnologies.map(tech => tech.id),
-            });
-
-            // Only update the UI state after successful API call
-            setFacultyTechnologies(updatedTechnologies);
-        } catch (error) {
-            console.error("Error updating technologies:", error);
-            // You might want to show an error message to the user here
-        }
-    };
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
@@ -279,58 +282,69 @@ function FacultyPage({ userId }) {
                                     />
                                 </div>
                             </div>
-                            {/* Technology Editor */}
                             <div>
                                 <label className="block text-gray-700 font-semibold mb-2">Technologies</label>
-                                <div className="relative">
-                                    {/* Search Input */}
-                                    <input
-                                        type="text"
-                                        placeholder="Search technologies..."
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
-                                    {/* Dropdown for Search Results */}
-                                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
-                                        {allTechnologies
-                                            .filter(
-                                                (tech) =>
-                                                    tech.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                                                    !facultyTechnologies.some((ft) => ft.id === tech.id)
-                                            )
-                                            .map((tech) => (
-                                                <div
+                                <div className="flex gap-4">
+                                    {/* Search and Dropdown */}
+                                    <div className="relative flex-grow">
+                                        {/* Search Input */}
+                                        <input
+                                            type="text"
+                                            placeholder="Search technologies..."
+                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                        {/* Dropdown for Search Results */}
+                                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
+                                            {allTechnologies
+                                                .filter(
+                                                    (tech) =>
+                                                        tech.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                                                        !pendingTechnologies.some((pt) => pt.id === tech.id)
+                                                )
+                                                .slice(0, 5) // Limit to 5 technologies
+                                                .map((tech) => (
+                                                    <div
+                                                        key={tech.id}
+                                                        className="px-4 py-2 hover:bg-amber-100 cursor-pointer"
+                                                        onClick={() =>
+                                                            handleTechnologyChange({
+                                                                id: tech.id,
+                                                                name: tech.name || tech.technology_name || tech.Technology_Name,
+                                                            })
+                                                        }
+                                                    >
+                                                        {tech.name || tech.technology_name || tech.Technology_Name}
+                                                    </div>
+                                                ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Selected Technologies */}
+                                    <div className="w-1/3 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50">
+                                        <label className="block text-gray-700 font-semibold mb-2">Selected Technologies</label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {pendingTechnologies.map((tech) => (
+                                                <span
                                                     key={tech.id}
-                                                    className="px-4 py-2 hover:bg-amber-100 cursor-pointer"
-                                                    onClick={() => handleTechnologyChange({
-                                                        id: tech.id,
-                                                        name: tech.name || tech.technology_name || tech.Technology_Name
-                                                    })}
+                                                    className="bg-amber-600 text-white px-4 py-2 rounded-full flex items-center"
                                                 >
                                                     {tech.name || tech.technology_name || tech.Technology_Name}
-                                                </div>
+                                                    <button
+                                                        className="ml-2 text-white hover:text-red-500"
+                                                        onClick={() => handleTechnologyChange(tech)}
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </span>
                                             ))}
+                                        </div>
                                     </div>
                                 </div>
-                                {/* Selected Technologies */}
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {facultyTechnologies.map((tech) => (
-                                        <span
-                                            key={tech.id}
-                                            className="bg-amber-600 text-white px-4 py-2 rounded-full flex items-center"
-                                        >
-                                            {tech.name || tech.technology_name || tech.Technology_Name}
-
-                                            <button
-                                                className="ml-2 text-white hover:text-red-500"
-                                                onClick={() => handleTechnologyChange(tech)}
-                                            >
-                                                ✕
-                                            </button>
-                                        </span>
-                                    ))}
-                                </div>
                             </div>
+
+
+
 
 
                             <button

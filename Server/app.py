@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from flask_cors import CORS
-from models import db, User, Project, Department,Technologies,themes,Faculty,Student,StudentTechnology,FacultyTechnology
+from models import db, User, Project, Department,Technologies,themes,Faculty,Student,StudentTechnology,FacultyTechnology,ProjectTechnology,ProjectStudent,ProjectTheme,ProjectFaculty
 import pymysql
 from flask_bcrypt import Bcrypt
 
@@ -128,25 +128,96 @@ def get_projects():
         'students_involved_count': project.students_involved_count,
         'start_date': project.start_date,
         'end_date': project.end_date,
-        'github_link': project.github_link
+        'github_link': project.github_link,
+        'owner_id':project.owner_id
+    } for project in projects])
+
+@app.route('/projectsidname', methods=['GET'])
+def get_projectsidname():
+    projects = Project.query.all()
+    return jsonify([{
+        'project_id': project.project_id,
+        'name': project.name,
+    } for project in projects])
+
+@app.route('/projectsown/<int:owner_id>', methods=['GET'])
+def get_projects_by_owner(owner_id):
+    # Query all projects with the specified owner_id
+    projects = Project.query.filter_by(owner_id=owner_id).all()
+    
+    # If no projects are found, return an appropriate message
+    if not projects:
+        return jsonify({'message': f'No projects found for owner_id {owner_id}'}), 404
+    
+    # Return the projects in JSON format
+    return jsonify([{
+        'project_id': project.project_id,
+        'name': project.name,
+        'description': project.description,
+        'budget': str(project.budget),
+        'status': project.status,
+        'students_involved_count': project.students_involved_count,
+        'start_date': project.start_date,
+        'end_date': project.end_date,
+        'github_link': project.github_link,
+        'owner_id': project.owner_id
     } for project in projects])
 
 @app.route('/projects', methods=['POST'])
 def add_project():
+    try:
+        data = request.json
+        
+        # Check if the owner exists
+        owner = User.query.get(data['owner_id'])
+        if not owner:
+            return jsonify({'error': 'Owner with the provided ID does not exist.'}), 400
+        
+        # Create a new project instance
+        new_project = Project(
+            name=data['name'],
+            description=data.get('description', ''),
+            budget=data.get('budget', 0.00),
+            status=data.get('status', 'Proposed'),
+            students_involved_count=data.get('students_involved_count', 0),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+            github_link=data.get('github_link', ''),
+            image=data.get('image', None),
+            owner_id=data['owner_id']
+        )
+        
+        # Add and commit the project
+        db.session.add(new_project)
+        db.session.commit()
+        
+        return jsonify({'message': 'Project added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'error': 'An unexpected error occurred.', 'details': str(e)}), 500
+
+@app.route('/projects/<int:project_id>', methods=['PUT'])
+def update_project(project_id):
     data = request.json
-    new_project = Project(
-        name=data['name'],
-        description=data['description'],
-        budget=data['budget'],
-        status=data['status'],
-        students_involved_count=data['students_involved_count'],
-        start_date=data['start_date'],
-        end_date=data['end_date'],
-        github_link=data['github_link']
-    )
-    db.session.add(new_project)
-    db.session.commit()
-    return jsonify({'message': 'Project added successfully!'})
+    project = Project.query.get(project_id)
+    if not project:
+        return jsonify({'message': 'Project not found'}), 404
+
+    try:
+        project.name = data.get('name', project.name)
+        project.description = data.get('description', project.description)
+        project.budget = data.get('budget', project.budget)
+        project.status = data.get('status', project.status)
+        project.students_involved_count = data.get('students_involved_count', project.students_involved_count)
+        project.start_date = data.get('start_date', project.start_date)
+        project.end_date = data.get('end_date', project.end_date)
+        project.github_link = data.get('github_link', project.github_link)
+
+        db.session.commit()
+        return jsonify({'message': 'Project updated successfully!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/departments', methods=['GET'])
 def get_departments():
@@ -177,6 +248,14 @@ def get_faculty():
         'phone_no': faculty.phone_no,
         'linkedin_profile': faculty.linkedin_profile,
         'github_profile': faculty.github_profile
+    } for faculty in faculty_members])
+
+@app.route('/facultyidname', methods=['GET'])
+def get_facultyidname():
+    faculty_members = Faculty.query.all()
+    return jsonify([{
+        'faculty_id': faculty.faculty_id,
+        'name': faculty.name,
     } for faculty in faculty_members])
 
 @app.route('/faculty/<int:user_id>', methods=['GET'])
@@ -293,6 +372,14 @@ def get_students():
         'github_profile': student.github_profile
     } for student in students])
 
+@app.route('/studentsidusn', methods=['GET'])
+def get_studentsidusn():
+    students = Student.query.all()
+    return jsonify([{
+        'student_id': student.student_id,
+        'usn': student.usn,
+    } for student in students])
+
 @app.route('/students', methods=['POST'])
 def add_student():
     data = request.json
@@ -388,15 +475,16 @@ def get_student_by_user_id(user_id):
     else:
         return jsonify({'error': 'Student not found'}), 404
 
-@app.route('/student_technologies', methods=['POST'])
-def update_student_technologies():
+
+
+@app.route('/student_technologies/<int:student_id>', methods=['PUT'])
+def update_student_technologies_put(student_id):
     try:
         data = request.get_json()
-        student_id = data.get('student_id')
         technology_ids = data.get('technology_ids')  # Accept an array of technology IDs
 
-        if not student_id or not technology_ids:
-            return jsonify({"error": "student_id and technology_ids are required"}), 400
+        if not technology_ids:
+            return jsonify({"error": "technology_ids are required"}), 400
 
         if not isinstance(technology_ids, list) or not all(isinstance(t_id, int) for t_id in technology_ids):
             return jsonify({"error": "technology_ids must be a list of integers"}), 400
@@ -427,75 +515,7 @@ def update_student_technologies():
         return jsonify({
             "message": "Student technologies updated successfully",
             "technologies": [{"id": t.technology_id, "name": t.technology.name} for t in updated_technologies]
-        }), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": "An error occurred", "details": str(e)}), 500
-
-# GET: Retrieve all technologies for a student
-
-
-# PUT: Update a student's technology
-@app.route('/student_technologies', methods=['PUT'])
-def update_student_technology():
-    data = request.get_json()
-    student_id = data.get('student_id')
-    old_technology_id = data.get('old_technology_id')
-    new_technology_id = data.get('new_technology_id')
-
-    if not student_id or not old_technology_id or not new_technology_id:
-        return jsonify({"error": "student_id, old_technology_id, and new_technology_id are required"}), 400
-
-    tech_entry = StudentTechnology.query.filter_by(student_id=student_id, technology_id=old_technology_id).first()
-
-    if not tech_entry:
-        return jsonify({"error": "Technology entry not found"}), 404
-
-    tech_entry.technology_id = new_technology_id
-    db.session.commit()
-    return jsonify({"message": "Student technology updated successfully"}), 200
-
-# POST: Add a new technology for a faculty
-@app.route('/faculty_technologies', methods=['POST'])
-def update_faculty_technologies():
-    try:
-        data = request.get_json()
-        faculty_id = data.get('faculty_id')
-        technology_ids = data.get('technology_ids')  # Accept an array of technology IDs
-
-        if not faculty_id or not technology_ids:
-            return jsonify({"error": "faculty_id and technology_ids are required"}), 400
-
-        if not isinstance(technology_ids, list) or not all(isinstance(t_id, int) for t_id in technology_ids):
-            return jsonify({"error": "technology_ids must be a list of integers"}), 400
-
-        # Check if the faculty ID exists
-        faculty = Faculty.query.get(faculty_id)
-        if not faculty:
-            return jsonify({"error": "Faculty not found"}), 404
-
-        # Check if all technology IDs exist
-        valid_technologies = Technologies.query.filter(Technologies.technology_id.in_(technology_ids)).all()
-        if len(valid_technologies) != len(technology_ids):
-            return jsonify({"error": "Some technology IDs are invalid"}), 400
-
-        # Clear existing technologies for the faculty
-        FacultyTechnology.query.filter_by(faculty_id=faculty_id).delete()
-
-        # Add new faculty-technology entries
-        new_entries = [
-            FacultyTechnology(faculty_id=faculty_id, technology_id=technology_id)
-            for technology_id in technology_ids
-        ]
-        db.session.add_all(new_entries)
-        db.session.commit()
-
-        # Return updated list of technologies
-        updated_technologies = FacultyTechnology.query.filter_by(faculty_id=faculty_id).all()
-        return jsonify({
-            "message": "Faculty technologies updated successfully",
-            "technologies": [{"id": t.technology_id, "name": t.technology.name} for t in updated_technologies]
-        }), 200 if request.method == 'PUT' else 201
+        }), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
@@ -542,8 +562,181 @@ def update_faculty_technologies_put(faculty_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
+    
+    
+@app.route('/project_technologies/<int:project_id>', methods=['PUT'])
+def update_project_technologies_put(project_id):
+    try:
+        data = request.get_json()
+        technology_ids = data.get('technology_ids')  # Accept an array of technology IDs
+
+        if not technology_ids:
+            return jsonify({"error": "technology_ids are required"}), 400
+
+        if not isinstance(technology_ids, list) or not all(isinstance(t_id, int) for t_id in technology_ids):
+            return jsonify({"error": "technology_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_technologies = Technologies.query.filter(Technologies.technology_id.in_(technology_ids)).all()
+        if len(valid_technologies) != len(technology_ids):
+            return jsonify({"error": "Some technology IDs are invalid"}), 400
+
+        # Clear existing technologies for the faculty
+        ProjectTechnology.query.filter_by(project_id=project_id).delete()
+
+        # Add new faculty-technology entries
+        new_entries = [
+            ProjectTechnology(project_id=project_id, technology_id=technology_id)
+            for technology_id in technology_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_technologies = ProjectTechnology.query.filter_by(project_id=project_id).all()
+        return jsonify({
+            "message": "Project technologies updated successfully",
+            "technologies": [{"id": t.technology_id, "name": t.technology.name} for t in updated_technologies]
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500    
+
+@app.route('/project_themes/<int:project_id>', methods=['PUT'])
+def update_project_themes_put(project_id):
+    try:
+        data = request.get_json()
+        theme_ids = data.get('theme_ids')  # Accept an array of technology IDs
+
+        if not theme_ids:
+            return jsonify({"error": "theme_ids are required"}), 400
+
+        if not isinstance(theme_ids, list) or not all(isinstance(t_id, int) for t_id in theme_ids):
+            return jsonify({"error": "theme_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_themes = themes.query.filter(themes.theme_id.in_(theme_ids)).all()
+        if len(valid_themes) != len(theme_ids):
+            return jsonify({"error": "Some themes IDs are invalid"}), 400
+
+        # Clear existing technologies for the faculty
+        ProjectTheme.query.filter_by(project_id=project_id).delete()
+
+        # Add new faculty-technology entries
+        new_entries = [
+            ProjectTheme(project_id=project_id, theme_id=theme_id)
+            for theme_id in theme_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_themes = ProjectTheme.query.filter_by(project_id=project_id).all()
+        return jsonify({
+            "message": "Project theme updated successfully",
+            "themes": [{"id": t.theme_id, "name": t.theme.name} for t in updated_themes]
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
 
 
+@app.route('/project_students/<int:project_id>', methods=['PUT'])
+def update_project_students_put(project_id):
+    try:
+        data = request.get_json()
+        student_ids = data.get('student_ids')  # Accept an array of technology IDs
+
+        if not student_ids:
+            return jsonify({"error": "student_ids are required"}), 400
+
+        if not isinstance(student_ids, list) or not all(isinstance(t_id, int) for t_id in student_ids):
+            return jsonify({"error": "student_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_student = Student.query.filter(Student.student_id.in_(student_ids)).all()
+        if len(valid_student) != len(student_ids):
+            return jsonify({"error": "Some student IDs are invalid"}), 400
+
+        # Clear existing technologies for the faculty
+        ProjectStudent.query.filter_by(project_id=project_id).delete()
+
+        # Add new faculty-technology entries
+        new_entries = [
+            ProjectStudent(project_id=project_id, student_id=student_id)
+            for student_id in student_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_students = ProjectStudent.query.filter_by(project_id=project_id).all()
+        return jsonify({
+            "message": "Project students updated successfully",
+            "students": [{"id": t.student_id, "name": t.student.name} for t in updated_students]
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500  
+    
+@app.route('/project_faculty/<int:project_id>', methods=['PUT'])
+def update_project_faculty_put(project_id):
+    try:
+        data = request.get_json()
+        faculty_ids = data.get('faculty_ids')  # Accept an array of technology IDs
+
+        if not faculty_ids:
+            return jsonify({"error": "faculty_ids are required"}), 400
+
+        if not isinstance(faculty_ids, list) or not all(isinstance(t_id, int) for t_id in faculty_ids):
+            return jsonify({"error": "faculty_ids must be a list of integers"}), 400
+
+        # Check if the faculty ID exists
+        project = Project.query.get(project_id)
+        if not project:
+            return jsonify({"error": "Project not found"}), 404
+
+        # Check if all technology IDs exist
+        valid_faculty = Faculty.query.filter(Faculty.faculty_id.in_(faculty_ids)).all()
+        if len(valid_faculty) != len(faculty_ids):
+            return jsonify({"error": "Some faculty IDs are invalid"}), 400
+
+        # Clear existing technologies for the faculty
+        ProjectFaculty.query.filter_by(project_id=project_id).delete()
+
+        # Add new faculty-technology entries
+        new_entries = [
+            ProjectFaculty(project_id=project_id, faculty_id=faculty_id)
+            for faculty_id in faculty_ids
+        ]
+        db.session.add_all(new_entries)
+        db.session.commit()
+
+        # Return updated list of technologies
+        updated_facultys = ProjectFaculty.query.filter_by(project_id=project_id).all()
+        return jsonify({
+            "message": "Project facultys updated successfully",
+            "facultys": [{"id": t.faculty_id, "name": t.faculty.name} for t in updated_facultys]
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+        
 # GET: Retrieve all technologies for a faculty
 @app.route('/faculty_technologies/<int:faculty_id>', methods=['GET'])
 def get_faculty_technologies(faculty_id):
@@ -555,6 +748,26 @@ def get_student_technologies(student_id):
     technologies = StudentTechnology.query.filter_by(student_id=student_id).all()
     return jsonify([{"student_id": tech.student_id, "technology_id": tech.technology_id} for tech in technologies]), 200
    
+@app.route('/project_technologies/<int:project_id>', methods=['GET'])
+def get_project_technologies(project_id):
+    technologies = ProjectTechnology.query.filter_by(project_id=project_id).all()
+    return jsonify([{"project_id": tech.project_id, "technology_id": tech.technology_id} for tech in technologies]), 200
+  
+@app.route('/project_themes/<int:project_id>', methods=['GET'])
+def get_project_themes(project_id):
+    themes = ProjectTheme.query.filter_by(project_id=project_id).all()
+    return jsonify([{"project_id": tech.project_id, "theme_id": tech.theme_id} for tech in themes]), 200
+
+@app.route('/project_students/<int:project_id>', methods=['GET'])
+def get_project_students(project_id):
+    students = ProjectStudent.query.filter_by(project_id=project_id).all()
+    return jsonify([{"project_id": tech.project_id, "student_id": tech.student_id} for tech in students]), 200  
+
+@app.route('/project_faculty/<int:project_id>', methods=['GET'])
+def get_project_faculty(project_id):
+    faculty = ProjectFaculty.query.filter_by(project_id=project_id).all()
+    return jsonify([{"project_id": tech.project_id, "faculty_id": tech.faculty_id} for tech in faculty]), 200  
+
 
 @app.cli.command('initdb')
 def init_db():
