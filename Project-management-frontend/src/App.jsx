@@ -15,7 +15,7 @@ function App() {
 
   return (
     <Router>
-      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100">
         <Routes>
           {/* Default Route */}
           <Route
