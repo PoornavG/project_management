@@ -1,4 +1,12 @@
 from flask import Flask, request, jsonify
+from flask_mail import Mail, Message
+import random
+import string
+from datetime import datetime, timedelta
+from threading import Timer
+import threading
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from flask_cors import CORS
@@ -14,36 +22,205 @@ bcrypt = Bcrypt(app)
 cors=CORS(app,origins='*')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'mysql+mysqlconnector://{Config.MYSQL_USER}:{Config.MYSQL_PASSWORD}@{Config.MYSQL_HOST}/{Config.MYSQL_DB}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = Config.SECRET_KEY
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USE_SSL'] = False
+app.config['MAIL_USERNAME'] = Config.MAIL_USERNAME
+app.config['MAIL_PASSWORD'] = Config.MAIL_PASSWORD
+app.config['MAIL_DEFAULT_SENDER'] = Config.MAIL_USERNAME
+mail = Mail(app)
 
 db.init_app(app)
 
+otp_store_lock = threading.Lock()
+otp_store = {} 
+
+def generate_otp(length=6):
+    return ''.join(random.choices(string.digits, k=length))
+
+def clear_expired_otp(email):
+    with otp_store_lock:
+        if email in otp_store:
+            del otp_store[email]
+
+def store_otp(email, otp, expiry_minutes=10):
+    expiry_time = datetime.utcnow() + timedelta(minutes=expiry_minutes)
+    
+    with otp_store_lock:
+        otp_store[email] = {
+            'otp': otp,
+            'expiry': expiry_time
+        }
+    
+    # Set up automatic cleanup after expiry
+    Timer(expiry_minutes * 60, clear_expired_otp, args=[email]).start()
+
+def verify_stored_otp(email, otp):
+    with otp_store_lock:
+        if email not in otp_store:
+            return False, "OTP not found"
+        
+        stored_data = otp_store[email]
+        if datetime.utcnow() > stored_data['expiry']:
+            del otp_store[email]
+            return False, "OTP has expired"
+        
+        if stored_data['otp'] != otp:
+            return False, "Invalid OTP"
+        
+        # Clear OTP after successful verification
+        del otp_store[email]
+        return True, "OTP verified successfully"
+
+def send_otp_email(email, otp):
+    try:
+        msg = Message(
+            subject="Your OTP Code",
+            recipients=[email],
+            body=f"Your OTP code is: {otp}\nThis code will expire in 10 minutes."
+        )
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+        return False
+
+@app.route('/send-otp', methods=['POST'])
+def send_otp():
+    try:
+        data = request.json
+        email = data.get('email')
+
+        if not email:
+            return jsonify({'message': 'Email is required'}), 400
+
+        # Check if user exists
+        user = User.query.filter_by(college_email=email).first()
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        # Generate OTP
+        otp = generate_otp()
+        
+        # Store OTP with expiry
+        store_otp(email, otp)
+
+        # Send OTP via email
+        if send_otp_email(email, otp):
+            return jsonify({'message': 'OTP sent successfully'}), 200
+        else:
+            # Clear stored OTP if email sending fails
+            with otp_store_lock:
+                otp_store.pop(email, None)
+            return jsonify({'message': 'Failed to send OTP'}), 500
+
+    except Exception as e:
+        return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
+
+@app.route('/verify-otp', methods=['POST'])
+def verify_otp():
+    try:
+        data = request.json
+        email = data.get('email')
+        otp = data.get('otp')
+
+        if not email or not otp:
+            return jsonify({'message': 'Email and OTP are required'}), 400
+
+        # Verify OTP
+        is_valid, message = verify_stored_otp(email, otp)
+        
+        if not is_valid:
+            return jsonify({'message': message}), 400
+
+        # Get user details
+        user = User.query.filter_by(college_email=email).first()
+        if user:
+            return jsonify({
+                'message': 'OTP verified successfully',
+                'user_id': user.user_id,
+                'role': user.role,
+                'is_profile_complete': user.is_profile_complete
+            }), 200
+        
+        return jsonify({'message': 'User not found'}), 404
+
+    except Exception as e:
+        return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
+
 @app.route('/signup', methods=['POST'])
 def signup():
-    data = request.json
-    # Check if email is already registered
-    if User.query.filter_by(college_email=data['college_email']).first():
-        return jsonify({'message': 'Email already registered!'}), 400
-    
-    # Hash the password
-    hashed_password = bcrypt.generate_password_hash(data['password']).decode('utf-8')
-    
-    # Create a new user
-    new_user = User(
-        college_email=data['college_email'],
-        hashed_password=hashed_password,
-        role=data.get('role', 'Student'),  # Default to 'Student'
-        is_profile_complete=False  # Default to False
-    )
-    
-    # Add the new user to the database
-    db.session.add(new_user)
-    db.session.commit()
+    try:
+        data = request.json
+        
+        required_fields = ['college_email', 'password', 'role']
+        if not all(field in data for field in required_fields):
+            return jsonify({'message': 'Missing required fields'}), 400
 
-    # Return user ID and success message
-    return jsonify({
-        'message': 'Sign-Up successful!',
-        'user_id': new_user.user_id  # Ensure the user_id is returned here
-    })
+        # Validate role
+        if data['role'] not in ['Faculty', 'Student']:
+            return jsonify({'message': 'Invalid role. Must be either Faculty or Student'}), 400
+
+        # Check if email is already registered
+        if User.query.filter_by(college_email=data['college_email']).first():
+            return jsonify({'message': 'Email already registered!'}), 400
+        
+        # Hash the password
+        hashed_password = bcrypt.generate_password_hash(data['password']).decode('utf-8')
+        
+        # Create a new user
+        new_user = User(
+            college_email=data['college_email'],
+            hashed_password=hashed_password,
+            role=data['role']
+        )
+        
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Sign-Up successful!',
+            'user_id': new_user.user_id
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
+
+@app.route('/resend-otp', methods=['POST'])
+def resend_otp():
+    try:
+        data = request.json
+        email = data.get('email')
+
+        if not email:
+            return jsonify({'message': 'Email is required'}), 400
+
+        # Check if user exists
+        user = User.query.filter_by(college_email=email).first()
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+
+        # Clear any existing OTP
+        with otp_store_lock:
+            otp_store.pop(email, None)
+
+        # Generate and store new OTP
+        otp = generate_otp()
+        store_otp(email, otp)
+
+        # Send new OTP
+        if send_otp_email(email, otp):
+            return jsonify({'message': 'New OTP sent successfully'}), 200
+        else:
+            with otp_store_lock:
+                otp_store.pop(email, None)
+            return jsonify({'message': 'Failed to send new OTP'}), 500
+
+    except Exception as e:
+        return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
 
 
 @app.route('/login', methods=['POST'])
@@ -66,6 +243,15 @@ def get_users():
         'created_at': user.created_at
     } for user in users])
 
+@app.route('/users/<int:user_id>', methods=['GET'])
+def get_user_role(user_id):
+    user = User.query.filter_by(user_id=user_id).first()
+    if user:
+        return jsonify({
+            'user_id': user.user_id,
+            'role': user.role
+        }), 200
+    return jsonify({'error': 'User not found'}), 404
 
 @app.route('/users', methods=['POST'])
 def add_user():
@@ -131,6 +317,24 @@ def get_projects():
         'github_link': project.github_link,
         'owner_id':project.owner_id
     } for project in projects])
+
+@app.route('/projects/<int:project_id>', methods=['GET'])
+def get_project_details(project_id):
+    project = Project.query.filter_by(project_id=project_id).first()
+    if project:
+        return jsonify({
+            'project_id': project.project_id,
+            'name': project.name,
+            'description': project.description,
+            'budget': str(project.budget),
+            'status': project.status,
+            'students_involved_count': project.students_involved_count,
+            'start_date': project.start_date,
+            'end_date': project.end_date,
+            'github_link': project.github_link,
+            'owner_id': project.owner_id
+        }), 200
+    return jsonify({'error': 'Project not found'}), 404
 
 @app.route('/projectsidname', methods=['GET'])
 def get_projectsidname():
@@ -279,6 +483,26 @@ def get_faculty_by_id(user_id):
             'phone_no': faculty.phone_no,
             'linkedin_profile': faculty.linkedin_profile,
             'github_profile': faculty.github_profile
+        }
+
+        return jsonify(faculty_data), 200
+
+    except Exception as e:
+        # Handle unexpected errors
+        return jsonify({"error": "An error occurred while fetching the faculty member", "details": str(e)}), 500
+    
+@app.route('/facultyid/<int:user_id>', methods=['GET'])
+def get_faculty_by_id_fid(user_id):
+    try:
+        # Query the faculty member by user_id
+        faculty = Faculty.query.filter_by(user_id=user_id).first()
+        # If the faculty member is not found, return a 404 error
+        if not faculty:
+            return jsonify({"error": "Faculty member not found"}), 404
+
+        # Prepare the faculty data for response
+        faculty_data = {
+            'faculty_id': faculty.faculty_id,
         }
 
         return jsonify(faculty_data), 200
@@ -474,6 +698,16 @@ def get_student_by_user_id(user_id):
         })
     else:
         return jsonify({'error': 'Student not found'}), 404
+    
+@app.route('/studentsgetstdid/<int:user_id>', methods=['GET'])
+def get_student_by_user_id_sid(user_id):
+    student = Student.query.filter_by(user_id=user_id).first()
+    if student:
+        return jsonify({
+            'student_id': student.student_id,
+        })
+    else:
+        return jsonify({'error': 'Student not found'}), 404    
 
 
 
@@ -763,10 +997,30 @@ def get_project_students(project_id):
     students = ProjectStudent.query.filter_by(project_id=project_id).all()
     return jsonify([{"project_id": tech.project_id, "student_id": tech.student_id} for tech in students]), 200  
 
+@app.route('/student_projects/<int:student_id>', methods=['GET'])
+def get_student_projects(student_id):
+    projects = ProjectStudent.query.filter_by(student_id=student_id).all()
+    if projects:
+        return jsonify([
+            {"project_id": project.project_id} 
+            for project in projects
+        ]), 200
+    return jsonify({'error': 'No projects found for this student'}), 404
+
 @app.route('/project_faculty/<int:project_id>', methods=['GET'])
 def get_project_faculty(project_id):
     faculty = ProjectFaculty.query.filter_by(project_id=project_id).all()
     return jsonify([{"project_id": tech.project_id, "faculty_id": tech.faculty_id} for tech in faculty]), 200  
+
+@app.route('/faculty_projects/<int:faculty_id>', methods=['GET'])
+def get_faculty_projects(faculty_id):
+    projects = ProjectFaculty.query.filter_by(faculty_id=faculty_id).all()
+    if projects:
+        return jsonify([
+            {"project_id": project.project_id, "faculty_id": project.faculty_id}
+            for project in projects
+        ]), 200
+    return jsonify({'error': 'No projects found for this faculty'}), 200
 
 
 @app.cli.command('initdb')

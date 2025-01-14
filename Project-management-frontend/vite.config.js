@@ -75,6 +75,26 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/projectsidame/, '/projectsidname') // Optional rewrite
       },
+      '/faculty_projects': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/faculty_projects/, '/faculty_projects') // Optional rewrite
+      },
+      '/student_projects': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/student_projects/, '/student_projects') // Optional rewrite
+      },
+      '/studentsgetstdid': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/studentsgetstdid/, '/studentsgetstdid') // Optional rewrite
+      },
+      '/facultyid': {
+        target: 'http://127.0.0.1:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/facultyid/, '/facultyid') // Optional rewrite
+      },
     }
   }
 });

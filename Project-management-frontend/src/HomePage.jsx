@@ -45,6 +45,14 @@ const HomePage = ({ userId }) => {
             description: 'Explore all academic projects and research work',
             link: '/projects-list',
             bgColor: 'bg-gradient-to-r from-pink-500 to-rose-500'
+        },
+        {
+            id: 6,
+            title: 'Projects I belong to',
+            icon: <FolderKanban size={24} />,
+            description: 'Explore projects you belong to',
+            link: `/projectsmepart/${userId}`,
+            bgColor: 'bg-gradient-to-r from-pink-500 to-rose-500'
         }
     ];
 

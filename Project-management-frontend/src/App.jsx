@@ -10,6 +10,7 @@ import AddProject from "./AddProject";
 import ProjectList from "./project-list";
 import StudentList from "./student-list";
 import FacultyList from "./faculty-list";
+import UserProjects from "./projectsmepartof";
 function App() {
   const [userId, setUserId] = useState(null); // Tracks the logged-in user's ID
 
@@ -46,7 +47,9 @@ function App() {
             element={<FacultyDetails userId={userId} />}
           />
           <Route path="/projects-list" element={<ProjectList />} />
-
+          <Route path="/projectsmepart/:userId"
+            element={<MyProjectWrapper />}
+          />
           <Route path="/student-list" element={<StudentList />} />
           <Route path="/faculty-list" element={<FacultyList />} />
           <Route path="/myprojects/:userId"
@@ -78,5 +81,9 @@ function ProjectWrapper() {
 function AddProjectWrapper() {
   const { userId } = useParams();
   return <AddProject ownerId={parseInt(userId, 10)} />;
+}
+function MyProjectWrapper() {
+  const { userId } = useParams();
+  return <UserProjects userId={parseInt(userId, 10)} />;
 }
 export default App;
