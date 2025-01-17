@@ -15,10 +15,10 @@ const UserProjects = ({ userId }) => {
     const [userRole, setUserRole] = useState(null);
     const [userSpecificId, setUserSpecificId] = useState(null);
 
-    // Search states (reused from ProjectList)
+    // Search states (modified for multiselect)
     const [searchTitle, setSearchTitle] = useState('');
-    const [selectedTech, setSelectedTech] = useState('');
-    const [selectedTheme, setSelectedTheme] = useState('');
+    const [selectedTech, setSelectedTech] = useState([]);
+    const [selectedTheme, setSelectedTheme] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('');
 
     // Status options
@@ -208,23 +208,36 @@ const UserProjects = ({ userId }) => {
         return facultyMember ? facultyMember.name : 'Unknown';
     };
 
-    // Filter projects (reused from ProjectList)
+    // Filter projects (modified for multiselect)
     const filteredProjects = projects.filter(project => {
         const matchesTitle = project.name.toLowerCase().includes(searchTitle.toLowerCase());
         const matchesStatus = !selectedStatus || project.status === selectedStatus;
-        const matchesTech = !selectedTech || (
+
+        const matchesTech = selectedTech.length === 0 || (
             projectRelations[project.project_id]?.technologies.some(
-                t => t.technology_id === parseInt(selectedTech)
+                t => selectedTech.includes(t.technology_id.toString())
             )
         );
-        const matchesTheme = !selectedTheme || (
+
+        const matchesTheme = selectedTheme.length === 0 || (
             projectRelations[project.project_id]?.themes.some(
-                t => t.theme_id === parseInt(selectedTheme)
+                t => selectedTheme.includes(t.theme_id.toString())
             )
         );
 
         return matchesTitle && matchesStatus && matchesTech && matchesTheme;
     });
+
+    // Handle multiselect changes
+    const handleTechChange = (e) => {
+        const values = Array.from(e.target.selectedOptions, option => option.value);
+        setSelectedTech(values);
+    };
+
+    const handleThemeChange = (e) => {
+        const values = Array.from(e.target.selectedOptions, option => option.value);
+        setSelectedTheme(values);
+    };
 
     if (loading) return (
         <div className="flex items-center justify-center p-8">
@@ -261,11 +274,11 @@ const UserProjects = ({ userId }) => {
                 />
 
                 <select
+                    multiple
                     value={selectedTech}
-                    onChange={(e) => setSelectedTech(e.target.value)}
-                    className="p-2 border rounded"
+                    onChange={handleTechChange}
+                    className="p-2 border rounded h-32"
                 >
-                    <option value="">All Technologies</option>
                     {technologies.map(tech => (
                         <option key={tech.Technology_id} value={tech.Technology_id}>
                             {tech.Technology_Name}
@@ -274,11 +287,11 @@ const UserProjects = ({ userId }) => {
                 </select>
 
                 <select
+                    multiple
                     value={selectedTheme}
-                    onChange={(e) => setSelectedTheme(e.target.value)}
-                    className="p-2 border rounded"
+                    onChange={handleThemeChange}
+                    className="p-2 border rounded h-32"
                 >
-                    <option value="">All Themes</option>
                     {themes.map(theme => (
                         <option key={theme.Theme_id} value={theme.Theme_id}>
                             {theme.Theme_Name}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, Users, GraduationCap, Building2, FolderKanban, User } from 'lucide-react';
+import { BookOpen, Users, GraduationCap, Building2, FolderKanban, User, TrendingUp } from 'lucide-react';
 
 const HomePage = ({ userId }) => {
     const [hoveredCard, setHoveredCard] = useState(null);
@@ -52,7 +52,15 @@ const HomePage = ({ userId }) => {
             icon: <FolderKanban size={24} />,
             description: 'Explore projects you belong to',
             link: `/projectsmepart/${userId}`,
-            bgColor: 'bg-gradient-to-r from-pink-500 to-rose-500'
+            bgColor: 'bg-gradient-to-r from-pink-500 to-indigo-500'
+        },
+        {
+            id: 7,
+            title: 'Charts',
+            icon: <TrendingUp size={24} />,
+            description: 'Explore projects through visualization',
+            link: `/charts`,
+            bgColor: 'bg-gradient-to-r from-slate-600 to-stone-400'
         }
     ];
 
