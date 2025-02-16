@@ -8,4 +8,4 @@ class Config:
     DEBUG = False
 
     MAIL_USERNAME = 'poornavfblr@gmail.com'
-    MAIL_PASSWORD = 'ppyetvyvqjitsixl' 
+    MAIL_PASSWORD = 'ezjugoenaecymgnz'

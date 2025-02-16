@@ -1,19 +1,49 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 function LoginSignUp({ onLoginSuccess }) {
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [message, setMessage] = useState("");
     const [role, setRole] = useState("Student");
     const [isLoading, setIsLoading] = useState(false);
     const [showOtpInput, setShowOtpInput] = useState(false);
     const [otp, setOtp] = useState("");
+    const [passwordError, setPasswordError] = useState("");
     const navigate = useNavigate();
 
+    const validatePassword = (password) => {
+        const minLength = password.length >= 8;
+        const hasCapital = /[A-Z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+        if (!minLength) {
+            return "Password must be at least 8 characters long";
+        }
+        if (!hasCapital) {
+            return "Password must contain at least one capital letter";
+        }
+        if (!hasNumber) {
+            return "Password must contain at least one number";
+        }
+        if (!hasSpecial) {
+            return "Password must contain at least one special character";
+        }
+        return "";
+    };
+
     const handleSignup = async () => {
+        const passwordValidationError = validatePassword(password);
+        if (passwordValidationError) {
+            setPasswordError(passwordValidationError);
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const response = await fetch("http://localhost:8080/signup", {
                 method: "POST",
@@ -133,6 +163,8 @@ function LoginSignUp({ onLoginSuccess }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
+        setPasswordError("");
+        setMessage("");
 
         if (isLogin) {
             await handleLogin();
@@ -170,14 +202,46 @@ function LoginSignUp({ onLoginSuccess }) {
 
                         <div className="space-y-2">
                             <label className="block text-gray-700 font-medium">Password</label>
-                            <input
-                                type="password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                                placeholder="••••••••"
-                                required
-                            />
+                            <div className="relative">
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    value={password}
+                                    onChange={(e) => {
+                                        setPassword(e.target.value);
+                                        if (!isLogin) {
+                                            setPasswordError(validatePassword(e.target.value));
+                                        }
+                                    }}
+                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                                    placeholder="••••••••"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                                >
+                                    {showPassword ? (
+                                        <EyeOff size={20} className="text-gray-500" />
+                                    ) : (
+                                        <Eye size={20} className="text-gray-500" />
+                                    )}
+                                </button>
+                            </div>
+                            {!isLogin && (
+                                <div className="text-xs text-gray-600 mt-1">
+                                    Password must contain:
+                                    <ul className="list-disc list-inside">
+                                        <li>At least 8 characters</li>
+                                        <li>One capital letter</li>
+                                        <li>One number</li>
+                                        <li>One special character</li>
+                                    </ul>
+                                </div>
+                            )}
+                            {passwordError && (
+                                <div className="text-red-500 text-sm mt-1">{passwordError}</div>
+                            )}
                         </div>
 
                         {!isLogin && (
@@ -230,7 +294,7 @@ function LoginSignUp({ onLoginSuccess }) {
                         ) : (
                             <button
                                 type="submit"
-                                disabled={isLoading}
+                                disabled={isLoading || (!isLogin && passwordError)}
                                 className="w-full py-2 px-4 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-blue-500 to-purple-500 text-white transform hover:-translate-y-1 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? (
@@ -267,6 +331,8 @@ function LoginSignUp({ onLoginSuccess }) {
                                 setMessage("");
                                 setShowOtpInput(false);
                                 setOtp("");
+                                setPasswordError("");
+                                setShowPassword(false);
                             }}
                         >
                             {isLogin ? "New here? Create an account" : "Already have an account? Login"}

@@ -148,5 +148,3 @@ class ProjectTechnology(db.Model):
     project = db.relationship('Project', back_populates='project_technologies')
     technology = db.relationship('Technologies', back_populates='project_technologies')
     
-
-

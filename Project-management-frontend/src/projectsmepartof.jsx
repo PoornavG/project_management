@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import { Search, X, ChevronDown } from 'lucide-react';
 
 const UserProjects = ({ userId }) => {
     // State management
@@ -21,8 +22,30 @@ const UserProjects = ({ userId }) => {
     const [selectedTheme, setSelectedTheme] = useState([]);
     const [selectedStatus, setSelectedStatus] = useState('');
 
+    const [isTechDropdownOpen, setIsTechDropdownOpen] = useState(false);
+    const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+    const [techSearch, setTechSearch] = useState('');
+    const [themeSearch, setThemeSearch] = useState('');
+
+    const techDropdownRef = useRef(null);
+    const themeDropdownRef = useRef(null);
     // Status options
     const statusOptions = ['Ongoing', 'Completed', 'Proposed'];
+
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (techDropdownRef.current && !techDropdownRef.current.contains(event.target)) {
+                setIsTechDropdownOpen(false);
+            }
+            if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target)) {
+                setIsThemeDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     // Step 1: Fetch user role
     const fetchUserRole = async () => {
@@ -208,6 +231,40 @@ const UserProjects = ({ userId }) => {
         return facultyMember ? facultyMember.name : 'Unknown';
     };
 
+    const toggleTech = (techId) => {
+        setSelectedTech(prev =>
+            prev.includes(techId)
+                ? prev.filter(id => id !== techId)
+                : [...prev, techId]
+        );
+    };
+
+    const toggleTheme = (themeId) => {
+        setSelectedTheme(prev =>
+            prev.includes(themeId)
+                ? prev.filter(id => id !== themeId)
+                : [...prev, themeId]
+        );
+    };
+
+    // Filter functions
+    const filteredTechnologies = technologies.filter(tech =>
+        tech.Technology_Name.toLowerCase().includes(techSearch.toLowerCase())
+    );
+
+    const filteredThemes = themes.filter(theme =>
+        theme.Theme_Name.toLowerCase().includes(themeSearch.toLowerCase())
+    );
+
+    const clearFilters = () => {
+        setSearchTitle('');
+        setSelectedTech([]);
+        setSelectedTheme([]);
+        setSelectedStatus('');
+        setTechSearch('');
+        setThemeSearch('');
+    };
+
     // Filter projects (modified for multiselect)
     const filteredProjects = projects.filter(project => {
         const matchesTitle = project.name.toLowerCase().includes(searchTitle.toLowerCase());
@@ -256,7 +313,6 @@ const UserProjects = ({ userId }) => {
             </div>
         </div>
     );
-
     return (
         <div className="p-4">
             <h1 className="text-2xl font-bold mb-4">
@@ -264,51 +320,142 @@ const UserProjects = ({ userId }) => {
             </h1>
 
             {/* Search and Filter Section */}
-            <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                <input
-                    type="text"
-                    placeholder="Search by title..."
-                    value={searchTitle}
-                    onChange={(e) => setSearchTitle(e.target.value)}
-                    className="p-2 border rounded"
-                />
+            <div className="mb-4 space-y-4">
+                <div className="flex flex-wrap gap-4">
+                    {/* Title Search */}
+                    <div className="flex-1 min-w-[240px]">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                            <input
+                                type="text"
+                                placeholder="Search by title..."
+                                className="pl-10 pr-4 py-2 w-full border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                value={searchTitle}
+                                onChange={(e) => setSearchTitle(e.target.value)}
+                            />
+                        </div>
+                    </div>
 
-                <select
-                    multiple
-                    value={selectedTech}
-                    onChange={handleTechChange}
-                    className="p-2 border rounded h-32"
-                >
-                    {technologies.map(tech => (
-                        <option key={tech.Technology_id} value={tech.Technology_id}>
-                            {tech.Technology_Name}
-                        </option>
-                    ))}
-                </select>
+                    {/* Technologies Dropdown */}
+                    <div className="min-w-[200px] relative" ref={techDropdownRef}>
+                        <button
+                            className="w-full border rounded-lg p-2 flex justify-between items-center bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            onClick={() => setIsTechDropdownOpen(!isTechDropdownOpen)}
+                        >
+                            <span className="text-gray-700">
+                                {selectedTech.length
+                                    ? `${selectedTech.length} technologies selected`
+                                    : 'Select Technologies'}
+                            </span>
+                            <ChevronDown className="text-gray-400" size={20} />
+                        </button>
 
-                <select
-                    multiple
-                    value={selectedTheme}
-                    onChange={handleThemeChange}
-                    className="p-2 border rounded h-32"
-                >
-                    {themes.map(theme => (
-                        <option key={theme.Theme_id} value={theme.Theme_id}>
-                            {theme.Theme_Name}
-                        </option>
-                    ))}
-                </select>
+                        {isTechDropdownOpen && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
+                                <div className="p-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Search technologies..."
+                                        className="w-full p-2 border rounded-lg"
+                                        value={techSearch}
+                                        onChange={(e) => setTechSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="max-h-60 overflow-y-auto">
+                                    {filteredTechnologies.map((tech) => (
+                                        <div
+                                            key={tech.Technology_id}
+                                            className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => toggleTech(tech.Technology_id.toString())}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTech.includes(tech.Technology_id.toString())}
+                                                onChange={() => { }}
+                                                className="mr-2"
+                                            />
+                                            <span>{tech.Technology_Name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
-                <select
-                    value={selectedStatus}
-                    onChange={(e) => setSelectedStatus(e.target.value)}
-                    className="p-2 border rounded"
-                >
-                    <option value="">All Statuses</option>
-                    {statusOptions.map(status => (
-                        <option key={status} value={status}>{status}</option>
-                    ))}
-                </select>
+                    {/* Themes Dropdown */}
+                    <div className="min-w-[200px] relative" ref={themeDropdownRef}>
+                        <button
+                            className="w-full border rounded-lg p-2 flex justify-between items-center bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
+                        >
+                            <span className="text-gray-700">
+                                {selectedTheme.length
+                                    ? `${selectedTheme.length} themes selected`
+                                    : 'Select Themes'}
+                            </span>
+                            <ChevronDown className="text-gray-400" size={20} />
+                        </button>
+
+                        {isThemeDropdownOpen && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
+                                <div className="p-2">
+                                    <input
+                                        type="text"
+                                        placeholder="Search themes..."
+                                        className="w-full p-2 border rounded-lg"
+                                        value={themeSearch}
+                                        onChange={(e) => setThemeSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="max-h-60 overflow-y-auto">
+                                    {filteredThemes.map((theme) => (
+                                        <div
+                                            key={theme.Theme_id}
+                                            className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                            onClick={() => toggleTheme(theme.Theme_id.toString())}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedTheme.includes(theme.Theme_id.toString())}
+                                                onChange={() => { }}
+                                                className="mr-2"
+                                            />
+                                            <span>{theme.Theme_Name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Status Dropdown */}
+                    <div className="min-w-[200px]">
+                        <select
+                            value={selectedStatus}
+                            onChange={(e) => setSelectedStatus(e.target.value)}
+                            className="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        >
+                            <option value="">All Statuses</option>
+                            {statusOptions.map(status => (
+                                <option key={status} value={status}>{status}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* Clear Filters Button */}
+                    <button
+                        onClick={clearFilters}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-600"
+                    >
+                        <X size={16} />
+                        Clear Filters
+                    </button>
+                </div>
+
+                {/* Results Counter */}
+                <div className="text-sm text-gray-600">
+                    Showing {filteredProjects.length} of {projects.length} projects
+                </div>
             </div>
 
             {/* Projects Table */}
