@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Search, X, ChevronDown } from 'lucide-react';
+
 function StudentPage({ userId }) {
     const [studentData, setStudentData] = useState(null);
     const [departments, setDepartments] = useState([]);
@@ -11,7 +13,24 @@ function StudentPage({ userId }) {
     const [editedData, setEditedData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+
+    const [isTechDropdownOpen, setIsTechDropdownOpen] = useState(false);
+    const [techSearch, setTechSearch] = useState('');
+    const techDropdownRef = useRef(null);
+    const [pendingTechnologies, setPendingTechnologies] = useState([]);
+
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (techDropdownRef.current && !techDropdownRef.current.contains(event.target)) {
+                setIsTechDropdownOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -99,15 +118,19 @@ function StudentPage({ userId }) {
         }));
     };
 
-    const [pendingTechnologies, setPendingTechnologies] = useState(studentTechnologies);
 
-    const handleTechnologyChange = (selectedTech) => {
-        // Update pending technologies
-        const updatedTechnologies = pendingTechnologies.some((tech) => tech.id === selectedTech.id)
-            ? pendingTechnologies.filter((tech) => tech.id !== selectedTech.id)
-            : [...pendingTechnologies, selectedTech];
+    const filteredTechnologies = allTechnologies.filter(tech =>
+        tech.name.toLowerCase().includes(techSearch.toLowerCase()) &&
+        !pendingTechnologies.some(pt => pt.id === tech.id)
+    );
 
-        setPendingTechnologies(updatedTechnologies);
+    // Toggle technology selection
+    const toggleTech = (techId, techName) => {
+        setPendingTechnologies(prev =>
+            prev.some(tech => tech.id === techId)
+                ? prev.filter(tech => tech.id !== techId)
+                : [...prev, { id: techId, name: techName }]
+        );
     };
 
     const handleUpdateProfile = async (e) => {
@@ -125,7 +148,7 @@ function StudentPage({ userId }) {
 
             // Update technologies
             const techResponse = await axios.put(`/student_technologies/${studentData.student_id}`, {
-                technology_ids: pendingTechnologies.map((tech) => tech.id),
+                technology_ids: pendingTechnologies.map(tech => tech.id),
             });
 
             if (profileResponse.ok && techResponse.status === 200) {
@@ -144,6 +167,7 @@ function StudentPage({ userId }) {
             setLoading(false);
         }
     };
+
 
     if (loading) return <div>Loading...</div>;
     if (error) return <div>Error: {error}</div>;
@@ -166,6 +190,83 @@ function StudentPage({ userId }) {
             </div>
         );
     }
+
+    const technologiesSection = (
+        <div className="space-y-4">
+            <label className="block text-gray-700 font-semibold">Technologies</label>
+
+            {/* Technologies Dropdown */}
+            <div className="relative" ref={techDropdownRef}>
+                <button
+                    type="button"
+                    className="w-full border rounded-lg p-3 flex justify-between items-center bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    onClick={() => setIsTechDropdownOpen(!isTechDropdownOpen)}
+                >
+                    <span className="text-gray-700">
+                        {pendingTechnologies.length
+                            ? `${pendingTechnologies.length} technologies selected`
+                            : 'Select Technologies'}
+                    </span>
+                    <ChevronDown className="text-gray-400" size={20} />
+                </button>
+
+                {isTechDropdownOpen && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg">
+                        <div className="p-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+                                <input
+                                    type="text"
+                                    placeholder="Search technologies..."
+                                    className="w-full pl-10 p-2 border rounded-lg"
+                                    value={techSearch}
+                                    onChange={(e) => setTechSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto">
+                            {filteredTechnologies.map((tech) => (
+                                <div
+                                    key={tech.id}
+                                    className="flex items-center px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                    onClick={() => toggleTech(tech.id, tech.name)}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={pendingTechnologies.some(t => t.id === tech.id)}
+                                        onChange={() => { }}
+                                        className="mr-2"
+                                    />
+                                    <span>{tech.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Selected Technologies Display */}
+            <div className="mt-4">
+                <div className="flex flex-wrap gap-2">
+                    {pendingTechnologies.map((tech) => (
+                        <span
+                            key={tech.id}
+                            className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm flex items-center"
+                        >
+                            {tech.name}
+                            <button
+                                type="button"
+                                onClick={() => toggleTech(tech.id, tech.name)}
+                                className="ml-2 text-blue-600 hover:text-blue-800"
+                            >
+                                <X size={14} />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
 
     if (!studentData) {
         return (
@@ -273,66 +374,8 @@ function StudentPage({ userId }) {
                                     />
                                 </div>
                             </div>
-                            <div>
-                                <label className="block text-gray-700 font-semibold mb-2">Technologies</label>
-                                <div className="flex gap-4">
-                                    {/* Search and Dropdown */}
-                                    <div className="relative flex-grow">
-                                        {/* Search Input */}
-                                        <input
-                                            type="text"
-                                            placeholder="Search technologies..."
-                                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                        />
-                                        {/* Dropdown for Search Results */}
-                                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg max-h-40 overflow-y-auto shadow-lg">
-                                            {allTechnologies
-                                                .filter(
-                                                    (tech) =>
-                                                        tech.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                                                        !pendingTechnologies.some((pt) => pt.id === tech.id)
-                                                )
-                                                .slice(0, 5) // Limit to 5 technologies
-                                                .map((tech) => (
-                                                    <div
-                                                        key={tech.id}
-                                                        className="px-4 py-2 hover:bg-amber-100 cursor-pointer"
-                                                        onClick={() =>
-                                                            handleTechnologyChange({
-                                                                id: tech.id,
-                                                                name: tech.name || tech.technology_name || tech.Technology_Name,
-                                                            })
-                                                        }
-                                                    >
-                                                        {tech.name || tech.technology_name || tech.Technology_Name}
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    </div>
 
-                                    {/* Selected Technologies */}
-                                    <div className="w-1/3 border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto bg-gray-50">
-                                        <label className="block text-gray-700 font-semibold mb-2">Selected Technologies</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {pendingTechnologies.map((tech) => (
-                                                <span
-                                                    key={tech.id}
-                                                    className="bg-blue-500 text-white px-4 py-2 rounded-full flex items-center"
-                                                >
-                                                    {tech.name || tech.technology_name || tech.Technology_Name}
-                                                    <button
-                                                        className="ml-2 text-white hover:text-red-500"
-                                                        onClick={() => handleTechnologyChange(tech)}
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            {technologiesSection}
 
                             <button
                                 type="submit"

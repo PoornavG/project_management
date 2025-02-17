@@ -67,7 +67,7 @@ class Student(db.Model):
     name = db.Column(db.String(255), nullable=False)
     usn = db.Column(db.String(20), unique=True, nullable=False)
     department_id = db.Column(db.Integer, db.ForeignKey('Departments.department_id'), nullable=False)
-    cgpa = db.Column(db.Numeric(3, 2))
+    cgpa = db.Column(db.Numeric(4, 2))
     personal_email = db.Column(db.String(255))
     phone_no = db.Column(db.String(15))
     linkedin_profile = db.Column(db.String(255))

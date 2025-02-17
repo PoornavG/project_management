@@ -4,7 +4,7 @@ class Config:
     MYSQL_PASSWORD = 'poornav'
     MYSQL_DB = 'project_management'
 
-    SECRET_KEY = 'your-secret-key-here'  # Change this to a secure random string
+    SECRET_KEY = 'your-secret-key-here'  
     DEBUG = False
 
     MAIL_USERNAME = 'poornavfblr@gmail.com'
