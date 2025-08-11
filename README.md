@@ -56,7 +56,7 @@ This is a full-stack web application designed for an academic environment, allow
 
 ## Project Structure
 
-
+```bash
 /
 ├── Server/
 │   ├── app.py              # Main Flask application file with API routes
@@ -75,7 +75,7 @@ This is a full-stack web application designed for an academic environment, allow
 ├── package.json        # Frontend dependencies and scripts
 └── vite.config.js      # Vite configuration file
 
-
+```
 ---
 
 ## Setup and Installation
@@ -90,7 +90,7 @@ This is a full-stack web application designed for an academic environment, allow
 
 1.  **Clone the repository**:
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/PoornavG/project_management
     cd project_management/Server
     ```
 
